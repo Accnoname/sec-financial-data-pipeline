@@ -1,105 +1,227 @@
-# 📈 SEC Financial Data Pipeline & RAG System
-> **Hệ thống Xử Lý Dữ Liệu Tài Chính & AI RAG (Retrieval-Augmented Generation) từ Báo Cáo 10-K SEC EDGAR**  
-> *Đồ án / Portfolio chuẩn Data Engineering & AI cho Sinh viên*
+# SEC Financial Data Pipeline and RAG System
+
+End-to-end financial data engineering pipeline and AI Retrieval-Augmented Generation (RAG) system built on SEC EDGAR Form 10-K annual filings using a 4-tier Medallion Lakehouse Architecture.
 
 ---
 
-## 🎯 Mục Tiêu Dự Án
-Xây dựng pipeline dữ liệu hoàn chỉnh từ đầu đến cuối (**End-to-End**):
-1. **Thu thập (Ingestion)**: Tự động tải danh sách 10.400+ mã công ty và báo cáo tài chính thường niên (Form 10-K) từ cổng **SEC EDGAR**.
-2. **Làm sạch (Transformation)**: Chuẩn hóa mã CIK 10 chữ số, lưu trữ tối ưu dưới định dạng **Parquet Snappy** (tiết kiệm >75% dung lượng).
-3. **Bóc tách văn bản AI**: Tước bỏ rác thẻ HTML/XBRL, trích xuất chuẩn xác phần giá trị nhất: **Item 1A - Risk Factors** sang định dạng **Markdown**.
-4. **Cắt đoạn ngữ nghĩa (RAG Chunking)**: Phân mảnh tài liệu thành các chunks tối ưu (500 từ) kèm metadata phong phú sẵn sàng nạp vào Vector Database.
+## Overview
+
+This project implements an automated, production-grade data pipeline that ingests, cleans, transforms, and structures SEC financial reports into semantic chunks ready for vector databases and Large Language Model (LLM) querying.
+
+The pipeline processes financial disclosures from major US technology companies (AAPL, AMZN, GOOGL, META, MSFT, NVDA, TSLA), strips noisy HTML and XBRL markup, isolates high-value risk factors (Item 1A), and generates enriched semantic chunks stored in Snappy-compressed columnar Parquet format.
 
 ---
 
-## 📂 Cấu Trúc Dự Án Chuẩn Modular
+## Key Features
+
+- Automated SEC EDGAR Ingestion: Fetches metadata for 10,400+ public companies and downloads raw annual Form 10-K filings via official SEC REST APIs.
+- Medallion Lakehouse Architecture: Organizes data flow into four quality tiers: Bronze (Raw), Silver (Cleaned and Structured), Gold (Semantic Chunks), and Curated (Vector Store).
+- Storage Optimization: Converts raw SEC JSON disclosures into columnar Snappy Parquet, achieving over 75% disk storage savings.
+- HTML and XBRL Extraction: Traverses document DOM structures to eliminate scripts, inline styling, and metadata headers, extracting Item 1A (Risk Factors) sections into clean Markdown.
+- Semantic Chunking: Segments financial narratives into sliding-window chunks (500 words, 100-word overlap) tagged with structured metadata (chunk ID, ticker, fiscal year, section, word count).
+- Automated Testing and Verification: End-to-end test suite enforcing data schema contracts, non-empty text fields, and CIK standard compliance across all companies.
+
+---
+
+## System Architecture
 
 ```text
-D:\Hệ Thống\
-│
-├── 📁 config/                      # Cấu hình tập trung (YAML & Settings)
-│   └── base_config.yaml           # Đường dẫn, tham số chunking, LLM model
-│
-├── 📁 data/                        # Hồ dữ liệu theo kiến trúc Medallion (Data Lake)
-│   ├── 01_raw/                    # [Bronze] Dữ liệu thô từ SEC (JSON, HTML gốc)
-│   │   ├── companies/             # all_companies.json
-│   │   └── sec_filings/           # HTML 10-K các mã lớn (AAPL, GOOGL, MSFT,...)
-│   ├── 02_staging/                # [Silver] Dữ liệu sạch cho AI
-│   │   ├── companies_clean.parquet# Đã làm sạch CIK, khử trùng lặp
-│   │   └── sec_filings/           # Markdown bóc tách (Item 1A Risk Factors)
-│   ├── 03_primary/                # [Gold] Dữ liệu chuẩn bị cho Vector DB
-│   │   └── chunks/                # Chunks JSON & Parquet kèm metadata
-│   └── 04_curated/                # [Curated] Vector Store (Qdrant / Chroma)
-│
-├── 📁 src/                         # Mã nguồn module hóa (Modular Architecture)
-│   ├── __init__.py
-│   ├── common/                    # Tiện ích chung
-│   │   ├── config.py              # Path resolver & nạp config
-│   │   └── logger.py              # Ghi log chuẩn định dạng
-│   ├── ingestion/                 # Module thu thập dữ liệu (ETL)
-│   │   ├── extract_companies.py   # [Bước 1] Kéo danh mục công ty từ SEC
-│   │   └── ingest_10k_filings.py  # [Bước 3] Tải báo cáo 10-K từ SEC
-│   ├── transformation/            # Module làm sạch dữ liệu
-│   │   ├── clean_companies.py     # [Bước 2] Chuẩn hóa CIK sang Parquet
-│   │   └── clean_10k_to_text.py   # [Bước 4] Tước rác HTML sang Markdown
-│   └── rag/                       # Module RAG phục vụ AI
-│       └── chunking.py            # [Bước 5] Semantic chunking cho Vector DB
-│
-├── 📁 notebooks/                   # Jupyter Notebook báo cáo / demo đồ án
-│   └── 01_pipeline_demo.ipynb     # Minh họa trực quan cho giảng viên
-│
-├── 📁 docs/                        # Tài liệu thuyết minh đồ án
-│   └── architecture.md            # Sơ đồ kiến trúc & giải thích chi tiết
-│
-├── 📁 infra/                       # Môi trường chạy phụ trợ (Docker Compose)
-│   └── docker-compose.yml         # Postgres, Qdrant Vector DB, MinIO
-│
-├── 📁 tests/                       # Unit Test kiểm thử pipeline
-│   └── test_pipeline.py           # Kiểm tra chất lượng dữ liệu & schema
-│
-├── 🚀 run.py                       # Master Runner điều phối toàn bộ từ thư mục gốc
-├── 📄 requirements.txt             # Danh sách thư viện Python cần cài
-├── 📄 pyproject.toml               # Cấu hình dự án Python
-├── 📄 .env.example                 # Mẫu file biến môi trường
-└── 📄 .gitignore                   # Bỏ qua cache và file dữ liệu nặng
+[SEC EDGAR REST API]
+         |
+         | (Step 1, 3: Ingestion)
+         v
++-------------------------------------------------------------+
+| BRONZE LAYER (data/01_raw/)                                 |
+| - companies/all_companies.json                              |
+| - sec_filings/{TICKER}/*.htm (Raw Form 10-K HTML files)     |
++-------------------------------------------------------------+
+         |
+         | (Step 2, 4: Cleaning and Normalization)
+         v
++-------------------------------------------------------------+
+| SILVER LAYER (data/02_staging/)                             |
+| - companies_clean.parquet (10-digit zero-padded CIK)        |
+| - sec_filings/{TICKER}/*_risk_factors.md                    |
++-------------------------------------------------------------+
+         |
+         | (Step 5: Semantic Chunking and Metadata Enrichment)|
+         v
++-------------------------------------------------------------+
+| GOLD LAYER (data/03_primary/)                               |
+| - chunks/{TICKER}_{YEAR}_chunks.parquet                     |
+| - chunks/all_chunks.parquet (Consolidated 262 chunks)       |
++-------------------------------------------------------------+
+         |
+         | (Step 6: Embedding and Indexing)
+         v
++-------------------------------------------------------------+
+| CURATED LAYER (data/04_curated/)                            |
+| - vector_db/ (Vector Store: Qdrant / Chroma / FAISS)        |
++-------------------------------------------------------------+
 ```
 
 ---
 
-## 🚀 Hướng Dẫn Sử Dụng Nhanh
+## Directory Structure
 
-### 1. Cài đặt môi trường
-Mở Terminal tại thư mục `D:\Hệ Thống>` và chạy:
-```bash
-pip install -r requirements.txt
+```text
+.
+|-- .agents/
+|   `-- rules/
+|       `-- no-decorative-symbols.md
+|-- AGENTS.md
+|-- README.md
+|-- pyproject.toml
+|-- requirements.txt
+|-- run.py
+|-- config/
+|   `-- base_config.yaml
+|-- data/
+|   |-- 01_raw/
+|   |   |-- companies/
+|   |   `-- sec_filings/
+|   |-- 02_staging/
+|   |   |-- companies_clean.parquet
+|   |   `-- sec_filings/
+|   |-- 03_primary/
+|   |   `-- chunks/
+|   `-- 04_curated/
+|       `-- vector_db/
+|-- docs/
+|   |-- architecture.md
+|   `-- project_learning_journal.md
+|-- infra/
+|   `-- docker-compose.yml
+|-- notebooks/
+|   `-- 01_pipeline_demo.ipynb
+|-- src/
+|   |-- common/
+|   |   |-- config.py
+|   |   `-- logger.py
+|   |-- ingestion/
+|   |   |-- extract_companies.py
+|   |   `-- ingest_10k_filings.py
+|   |-- rag/
+|   |   `-- chunking.py
+|   `-- transformation/
+|       |-- clean_10k_to_text.py
+|       `-- clean_companies.py
+`-- tests/
+    `-- test_pipeline.py
 ```
 
-### 2. Chạy Pipeline điều phối
-Chạy file điều phối chính `run.py`:
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.10 or higher
+- Git
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/Accnoname/sec-financial-data-pipeline.git
+   cd sec-financial-data-pipeline
+   ```
+
+2. Create and activate a virtual environment:
+   ```bash
+   python -m venv .venv
+   # Windows:
+   .venv\Scripts\activate
+   # Linux/macOS:
+   source .venv/bin/activate
+   ```
+
+3. Install required dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+---
+
+## Pipeline Execution
+
+The master pipeline orchestrator is located in `run.py`. It provides CLI commands to execute individual steps or run the entire workflow end-to-end.
+
+### Run All Pipeline Steps
+
 ```bash
-# Xem menu lựa chọn bước:
-python run.py
-
-# Hoặc chạy trực tiếp từng bước:
-python run.py 1    # [Bước 1] Kéo danh mục 10.400+ công ty từ SEC
-python run.py 2    # [Bước 2] Chuẩn hóa CIK sang Parquet (Silver)
-python run.py 3    # [Bước 3] Tải báo cáo tài chính 10-K (Bronze)
-python run.py 4    # [Bước 4] Bóc tách HTML sang Markdown cho AI (Silver)
-python run.py 5    # [Bước 5] Cắt đoạn Chunking cho RAG (Gold)
-
-# Hoặc chạy toàn bộ luồng tự động:
 python run.py all
 ```
 
-### 3. Kiểm thử tự động (Unit Test)
+### Run Individual Steps
+
 ```bash
-pytest tests/ -v
+# Step 1: Fetch company directory from SEC EDGAR (Bronze)
+python run.py 1
+
+# Step 2: Normalize CIK codes and export to Parquet (Silver)
+python run.py 2
+
+# Step 3: Ingest Form 10-K filings for target companies (Bronze)
+python run.py 3
+
+# Step 4: Extract Item 1A Risk Factors to Markdown for all companies (Silver)
+python run.py 4
+
+# Step 4 for a single company:
+python run.py 4 AAPL
+
+# Step 5: Perform semantic chunking and generate Gold Parquet datasets
+python run.py 5
+
+# Step 5 for a single company:
+python run.py 5 NVDA
 ```
 
 ---
 
-## 📊 Kết Quả Đạt Được
-- **Tiết kiệm dung lượng**: Dữ liệu danh mục công ty giảm hơn **76%** dung lượng khi chuyển từ JSON sang Parquet Snappy.
-- **Làm sạch văn bản AI**: Bóc tách thành công văn bản HTML nặng ~2.6 MB thành Markdown sạch (~85 KB) chỉ chứa phần **Item 1A - Risk Factors**.
-- **Sẵn sàng cho Vector DB**: Chia nhỏ thành các chunks ~500 từ có overlap 100 từ, kèm đầy đủ metadata (`chunk_id`, `ticker`, `year`, `section`).
+## Automated Testing
+
+Run the automated test suite with pytest to validate data schemas, extraction integrity, and file generation across all stages:
+
+```bash
+python -m pytest tests/ -v
+```
+
+### Test Coverage
+
+- `test_raw_companies_json_exists`: Verifies raw SEC company data exists and meets size thresholds.
+- `test_raw_sec_filings_exist`: Ensures all target companies have downloaded Form 10-K HTML files exceeding 500 KB.
+- `test_staging_parquet_schema`: Validates 10-digit zero-padded CIK string formatting and required schema columns.
+- `test_markdown_risk_factors_all_tickers`: Confirms successful extraction of Item 1A text (>10,000 characters) across all companies.
+- `test_gold_chunks_schema_and_content`: Checks chunk count, metadata columns, and non-empty text records in `all_chunks.parquet`.
+
+---
+
+## Data Specifications
+
+| Layer | Path | Format | Description |
+| :--- | :--- | :--- | :--- |
+| Bronze | `data/01_raw/companies/` | JSON | Raw company tickers and exchange mapping (10,400+ records) |
+| Bronze | `data/01_raw/sec_filings/` | HTML | Raw annual Form 10-K filings from SEC EDGAR |
+| Silver | `data/02_staging/companies_clean.parquet` | Parquet (Snappy) | Cleaned company master list with standardized 10-digit CIKs |
+| Silver | `data/02_staging/sec_filings/{TICKER}/` | Markdown | Extracted and normalized Item 1A Risk Factors text |
+| Gold | `data/03_primary/chunks/` | Parquet / JSON | 500-word sliding-window chunks with metadata IDs and word counts |
+| Curated | `data/04_curated/vector_db/` | Vector Store | Indexed vector embeddings for semantic search and RAG QA |
+
+---
+
+## Technology Stack
+
+- Language: Python 3.10+
+- Data Processing: Pandas, PyArrow (Snappy compression)
+- Parsing and Extraction: BeautifulSoup4, lxml, RegEx
+- Ingestion and Networking: Requests
+- Infrastructure: Docker Compose (PostgreSQL, Qdrant Vector Store, MinIO)
+- Testing: Pytest
+
+---
+
+## License
+
+This project is licensed under the MIT License.
