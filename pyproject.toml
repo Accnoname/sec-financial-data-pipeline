@@ -3,44 +3,34 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "stockmarket-rag-pipeline"
-version = "0.1.0"
-description = "Enterprise Data Engineering & RAG Pipeline for Stock Market SEC Filings"
+name = "sec-financial-data-pipeline"
+version = "1.0.0"
+description = "SEC Financial Data Pipeline and RAG System - Medallion Lakehouse Architecture"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "Data Engineering Team"}
+    {name = "Accnoname"}
 ]
 
 dependencies = [
     "requests>=2.31.0",
-    "pydantic>=2.7.0",
     "pandas>=2.2.0",
     "pyarrow>=15.0.0",
-    "python-dotenv>=1.0.1",
-    "pyyaml>=6.0.1",
-    "SQLAlchemy>=2.0.0",
-    "psycopg2-binary>=2.9.9",
-    "qdrant-client>=1.9.0",
-    "langchain>=0.2.0",
-    "openai>=1.30.0",
-    "loguru>=0.7.2"
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.0.0",
+    "sentence-transformers>=3.0.0",
+    "chromadb>=0.5.0",
+    "google-generativeai>=0.7.0",
+    "python-dotenv>=1.0.0"
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
-    "black>=24.0.0",
-    "flake8>=7.0.0",
-    "mypy>=1.9.0",
     "ipykernel>=6.29.0"
 ]
-
-[tool.black]
-line-length = 88
-target-version = ['py310']
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
