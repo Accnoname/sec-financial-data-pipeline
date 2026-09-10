@@ -11,3 +11,9 @@
 ## Rule 3: Clean Engineering Tone
 - Use factual, precise technical language.
 - Avoid marketing fluff, decorative icons, and unnecessary formatting flourishes.
+
+## Rule 4: Planning and Autonomous Execution
+- When given a task, present a structured implementation plan outlining: objectives, files affected, technical approach, and verification steps.
+- Wait for user feedback or approval.
+- Once approved by the user, execute all steps autonomously to completion without requesting redundant micro-confirmations.
+- Run tests and deliver the final result upon completion.

@@ -58,3 +58,6 @@ logs/
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints
+
+# ChromaDB vector store (generated, do not commit)
+data/04_curated/vector_db/
