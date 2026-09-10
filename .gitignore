@@ -61,3 +61,8 @@ logs/
 
 # ChromaDB vector store (generated, do not commit)
 data/04_curated/vector_db/
+
+# AI Agent rules & workflows (local only, do not commit)
+.agents/
+AGENTS.md
+.github/
