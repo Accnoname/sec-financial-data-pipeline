@@ -101,3 +101,31 @@ def test_gold_chunks_schema_and_content():
     # Kiểm tra không có chunk nào rỗng hoặc từ quá ít
     assert df["text"].str.strip().ne("").all(), "Tồn tại chunk có text rỗng"
     assert (df["word_count"] > 0).all(), "Tồn tại chunk có word_count <= 0"
+
+
+def test_curated_vector_db():
+    """Kiểm tra ChromaDB tại Tầng Curated đã nạp đủ vector chunks"""
+    vector_db_dir = DATA_DIR / "04_curated" / "vector_db"
+    assert vector_db_dir.exists(), f"Chưa tìm thấy vector DB tại {vector_db_dir}"
+
+    import chromadb
+    from chromadb.config import Settings
+    client = chromadb.PersistentClient(path=str(vector_db_dir), settings=Settings(anonymized_telemetry=False))
+    col = client.get_collection("sec_risk_factors")
+    count = col.count()
+    assert count >= 260, f"Số vector trong ChromaDB quá ít: {count}"
+
+
+def test_rag_prompt_construction():
+    """Kiểm tra logic tạo Prompt cho LLM từ chunks"""
+    from src.rag.retriever import _build_prompt
+    fake_chunks = [
+        {
+            "text": "NVIDIA faces severe supply chain constraints on AI chips.",
+            "metadata": {"ticker": "NVDA", "year": 2026, "section": "Item 1A", "chunk_index": 1}
+        }
+    ]
+    prompt = _build_prompt("What are NVDA risks?", fake_chunks)
+    assert "[Source 1: NVDA 2026, Item 1A, chunk 1]" in prompt
+    assert "NVIDIA faces severe supply chain" in prompt
+    assert "What are NVDA risks?" in prompt
