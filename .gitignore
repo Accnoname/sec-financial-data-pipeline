@@ -62,7 +62,11 @@ logs/
 # ChromaDB vector store (generated, do not commit)
 data/04_curated/vector_db/
 
+# Scratch and temporary scripts
+scratch/
+
 # AI Agent rules & workflows (local only, do not commit)
 .agents/
+.gemini/
 AGENTS.md
-.github/
+

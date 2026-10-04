@@ -38,6 +38,23 @@ def run_step_7(question: str | None = None):
     return rag_query(question)
 
 
+def run_dag(arg: str | None = None):
+    """Chạy toàn bộ pipeline qua bộ điều phối Orchestration DAG với Retry & Quality Gate."""
+    from src.orchestration.dag import build_sec_pipeline_dag
+    force = (arg is not None and arg.lower() in ("--force", "-f", "force"))
+    dag = build_sec_pipeline_dag(force=force)
+    results = dag.execute()
+    return results
+
+
+def run_scheduler(interval: str | None = None):
+    """Khởi động tiến trình lập lịch tự động định kỳ."""
+    from src.orchestration.scheduler import PipelineScheduler
+    secs = int(interval) if interval and interval.isdigit() else 7200
+    scheduler = PipelineScheduler(interval_seconds=secs)
+    scheduler.start(run_immediately=True)
+
+
 STEPS = {
     "1": ("Kéo danh mục 10.400+ công ty từ SEC EDGAR", fetch_and_save_companies),
     "2": ("Chuẩn hóa CIK & xuất Parquet Silver", clean_companies),
@@ -46,6 +63,8 @@ STEPS = {
     "5": ("Semantic Chunking nạp Tầng Gold Parquet & JSON", run_step_5),
     "6": ("Tạo vector embedding & nạp vào ChromaDB (Tầng Curated)", run_step_6),
     "7": ("RAG Query: Hỏi đáp tài chính bằng Gemini AI", run_step_7),
+    "dag": ("Chạy toàn bộ qua DAG Orchestration (Retry & Quality Gate)", run_dag),
+    "schedule": ("Chạy tiến trình lập lịch tự động ngầm định kỳ", run_scheduler),
 }
 
 
@@ -54,10 +73,14 @@ def print_banner():
 =============================================================================
  SEC FINANCIAL DATA PIPELINE & AI RAG SYSTEM
  Medallion Architecture: Bronze -> Silver -> Gold -> Curated
+ Enterprise Orchestration: DAG Runner, Exponential Backoff, Quality Gates
 =============================================================================
  Huong dan su dung:
    python run.py             : Hien thi menu
-   python run.py all         : Chay toan bo pipeline (Buoc 1 -> 5)
+   python run.py dag         : [Orchestration] Kiem tra delta sensor va chay DAG
+   python run.py dag --force : [Orchestration] Buoc tai va xu ly lai tu dau
+   python run.py schedule    : [Scheduler] Khoi dong daemon tu dong dinh ky (2h)
+   python run.py all         : Chay toan bo pipeline tuan tu (Buoc 1 -> 5)
    python run.py 1           : [Buoc 1] Keo danh muc cong ty tu SEC
    python run.py 2           : [Buoc 2] Chuan hoa Parquet (Silver)
    python run.py 3           : [Buoc 3] Tai Form 10-K goc (Bronze)
@@ -67,21 +90,20 @@ def print_banner():
    python run.py 5 GOOGL     : [Buoc 5] Cat doan rieng cho ma GOOGL
    python run.py 6           : [Buoc 6] Tao Vector Index (ChromaDB)
    python run.py 7 "cau hoi" : [Buoc 7] Hoi dap RAG bang Gemini AI
+   python run.py "cau hoi"   : [Smart] Tu dong nhan dien cau hoi va goi RAG
 =============================================================================
 """)
 
 
 def main():
-    if len(sys.argv) > 1 and sys.argv[1].lower() in ("-h", "--help", "help"):
+    raw_arg = sys.argv[1] if len(sys.argv) > 1 else "menu"
+    sub_arg = sys.argv[2] if len(sys.argv) > 2 else None
+
+    if raw_arg.lower() in ("menu", "-h", "--help", "help"):
         print_banner()
         return
 
-    print_banner()
-    target = sys.argv[1].lower() if len(sys.argv) > 1 else "menu"
-    sub_arg = sys.argv[2] if len(sys.argv) > 2 else None
-
-    if target == "menu":
-        return
+    target = raw_arg.lower()
 
     if target in ("all", "a"):
         # "all" chay buoc 1 den 5 (pipeline data engineering)
@@ -91,15 +113,19 @@ def main():
             fn()
     elif target in STEPS:
         name, fn = STEPS[target]
-        print(f"\n===> [BUOC {target}] {name}...")
-        if target in ("4", "5") and sub_arg:
+        print(f"\n===> [{target.upper()}] {name}...")
+        if target in ("4", "5", "schedule", "dag") and sub_arg:
             fn(sub_arg)
         elif target == "7":
             fn(sub_arg)
         else:
             fn()
+    elif " " in raw_arg or len(raw_arg) > 4:
+        # Tu dong nhan dien cau hoi neu nguoi dung quen so 7
+        print(f"-> Tu dong nhan dien cau hoi RAG: \"{raw_arg}\"")
+        run_step_7(raw_arg)
     else:
-        print(f"Tham so khong hop le: '{target}'. Chon tu 1 den 7 hoac 'all'.")
+        print(f"Tham so khong hop le: '{raw_arg}'. Chon tu 1 den 7, 'dag', 'schedule' hoac 'all'.")
         sys.exit(1)
 
     print("\n[OK] Hoan thanh.")

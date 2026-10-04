@@ -63,8 +63,8 @@ def test_item_1a_regex_matching():
 
 
 def test_run_steps_registration():
-    """Verify that all 7 pipeline steps are registered in run.py with callable functions"""
-    expected_steps = {"1", "2", "3", "4", "5", "6", "7"}
+    """Verify that all pipeline steps and orchestration commands are registered in run.py"""
+    expected_steps = {"1", "2", "3", "4", "5", "6", "7", "dag", "schedule"}
     assert set(run.STEPS.keys()) == expected_steps
 
     for step_id, (name, fn) in run.STEPS.items():
