@@ -1,0 +1,98 @@
+{
+  "label": "tokenaware",
+  "total_chunks_in_pool": 925,
+  "random_baseline": {
+    "trials": 500,
+    "hit@1": 0.0094,
+    "hit@5": 0.0489,
+    "hit@15": 0.1564,
+    "mrr": 0.0337
+  },
+  "dense": {
+    "overall": {
+      "n": 20,
+      "hit@1": "5/20 (0.25)",
+      "hit@5": 0.6,
+      "hit@5_count": "12/20",
+      "hit@15": 0.9,
+      "hit@15_count": "18/20",
+      "mrr": 0.401
+    },
+    "late_in_old_chunk (blind spot)": {
+      "n": 10,
+      "hit@1": "1/10 (0.1)",
+      "hit@5": 0.5,
+      "hit@5_count": "5/10",
+      "hit@15": 0.9,
+      "hit@15_count": "9/10",
+      "mrr": 0.2821
+    },
+    "early_in_old_chunk": {
+      "n": 10,
+      "hit@1": "4/10 (0.4)",
+      "hit@5": 0.7,
+      "hit@5_count": "7/10",
+      "hit@15": 0.9,
+      "hit@15_count": "9/10",
+      "mrr": 0.52
+    }
+  },
+  "bm25": {
+    "overall": {
+      "n": 20,
+      "hit@1": "6/20 (0.3)",
+      "hit@5": 0.65,
+      "hit@5_count": "13/20",
+      "hit@15": 0.8,
+      "hit@15_count": "16/20",
+      "mrr": 0.4326
+    },
+    "late_in_old_chunk (blind spot)": {
+      "n": 10,
+      "hit@1": "2/10 (0.2)",
+      "hit@5": 0.6,
+      "hit@5_count": "6/10",
+      "hit@15": 0.7,
+      "hit@15_count": "7/10",
+      "mrr": 0.3408
+    },
+    "early_in_old_chunk": {
+      "n": 10,
+      "hit@1": "4/10 (0.4)",
+      "hit@5": 0.7,
+      "hit@5_count": "7/10",
+      "hit@15": 0.9,
+      "hit@15_count": "9/10",
+      "mrr": 0.5244
+    }
+  },
+  "hybrid_rrf": {
+    "overall": {
+      "n": 20,
+      "hit@1": "5/20 (0.25)",
+      "hit@5": 0.65,
+      "hit@5_count": "13/20",
+      "hit@15": 0.9,
+      "hit@15_count": "18/20",
+      "mrr": 0.4297
+    },
+    "late_in_old_chunk (blind spot)": {
+      "n": 10,
+      "hit@1": "1/10 (0.1)",
+      "hit@5": 0.5,
+      "hit@5_count": "5/10",
+      "hit@15": 0.9,
+      "hit@15_count": "9/10",
+      "mrr": 0.3269
+    },
+    "early_in_old_chunk": {
+      "n": 10,
+      "hit@1": "4/10 (0.4)",
+      "hit@5": 0.8,
+      "hit@5_count": "8/10",
+      "hit@15": 0.9,
+      "hit@15_count": "9/10",
+      "mrr": 0.5325
+    }
+  }
+}

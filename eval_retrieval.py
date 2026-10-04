@@ -89,10 +89,11 @@ def hybrid_retrieve(query: str, ticker: str, year: int, top_k: int = 5) -> List[
     Truy vấn kết hợp Dense + BM25 qua RRF (k=60).
     """
     retriever = get_retriever()
+    pool_size = max(30, top_k * 2)
     results = retriever.retrieve(
         query=query,
         top_k=top_k,
-        candidate_pool_size=15,
+        candidate_pool_size=pool_size,
         ticker=ticker,
         year=year,
     )
@@ -100,7 +101,7 @@ def hybrid_retrieve(query: str, ticker: str, year: int, top_k: int = 5) -> List[
         results = retriever.retrieve(
             query=query,
             top_k=top_k,
-            candidate_pool_size=15,
+            candidate_pool_size=pool_size,
             ticker=ticker,
         )
     return results
@@ -134,15 +135,66 @@ def check_anchors(questions: List[Dict[str, Any]], all_chunks: List[Dict[str, An
         print(f"FAIL: Co {missing} cau hoi can dieu chinh lai anchor_text truoc khi do!\n")
 
 
-def evaluate_mode(mode_func, questions: List[Dict[str, Any]], top_k: int = 5) -> Dict[str, Any]:
-    hits_overall = 0
+def compute_random_baseline(questions: List[Dict[str, Any]], all_chunks: List[Dict[str, Any]], num_trials: int = 500) -> Dict[str, Any]:
+    """Tính random baseline qua mô phỏng Monte Carlo trên pool sau khi lọc ticker+year."""
+    import random
+    random.seed(42)
+    
+    hits_1 = 0
+    hits_5 = 0
+    hits_15 = 0
+    mrr_total = 0.0
+    total_runs = num_trials * len(questions)
+
+    for _ in range(num_trials):
+        for q in questions:
+            t = q["ticker"]
+            y = q["year"]
+            anchor_norm = normalize_text(q["anchor_text"])
+            pool = [c for c in all_chunks if c.get("ticker") == t and c.get("year") == y]
+            if not pool:
+                pool = [c for c in all_chunks if c.get("ticker") == t]
+            
+            sampled = random.sample(pool, min(15, len(pool)))
+            hit_rank = 0
+            for rank, c in enumerate(sampled, 1):
+                if anchor_norm in normalize_text(c["text"]):
+                    hit_rank = rank
+                    break
+            
+            if hit_rank == 1:
+                hits_1 += 1
+            if 1 <= hit_rank <= 5:
+                hits_5 += 1
+            if 1 <= hit_rank <= 15:
+                hits_15 += 1
+            if hit_rank > 0:
+                mrr_total += 1.0 / hit_rank
+
+    return {
+        "trials": num_trials,
+        "hit@1": round(hits_1 / total_runs, 4),
+        "hit@5": round(hits_5 / total_runs, 4),
+        "hit@15": round(hits_15 / total_runs, 4),
+        "mrr": round(mrr_total / total_runs, 4),
+    }
+
+
+def evaluate_mode(mode_func, questions: List[Dict[str, Any]], top_k: int = 15) -> Dict[str, Any]:
+    hits_1_overall = 0
+    hits_5_overall = 0
+    hits_15_overall = 0
     mrr_overall = 0.0
 
-    hits_late = 0
+    hits_1_late = 0
+    hits_5_late = 0
+    hits_15_late = 0
     mrr_late = 0.0
     count_late = 0
 
-    hits_early = 0
+    hits_1_early = 0
+    hits_5_early = 0
+    hits_15_early = 0
     mrr_early = 0.0
     count_early = 0
 
@@ -165,30 +217,58 @@ def evaluate_mode(mode_func, questions: List[Dict[str, Any]], top_k: int = 5) ->
                 break
 
         if hit_rank > 0:
-            hits_overall += 1
             mrr_overall += 1.0 / hit_rank
+            if hit_rank == 1:
+                hits_1_overall += 1
+            if hit_rank <= 5:
+                hits_5_overall += 1
+            if hit_rank <= 15:
+                hits_15_overall += 1
+
             if is_late:
-                hits_late += 1
                 mrr_late += 1.0 / hit_rank
+                if hit_rank == 1:
+                    hits_1_late += 1
+                if hit_rank <= 5:
+                    hits_5_late += 1
+                if hit_rank <= 15:
+                    hits_15_late += 1
             else:
-                hits_early += 1
                 mrr_early += 1.0 / hit_rank
+                if hit_rank == 1:
+                    hits_1_early += 1
+                if hit_rank <= 5:
+                    hits_5_early += 1
+                if hit_rank <= 15:
+                    hits_15_early += 1
 
     n = len(questions)
     return {
         "overall": {
             "n": n,
-            "hit@5": round(hits_overall / n, 4),
+            "hit@1": f"{hits_1_overall}/{n} ({round(hits_1_overall / n, 4)})",
+            "hit@5": round(hits_5_overall / n, 4),
+            "hit@5_count": f"{hits_5_overall}/{n}",
+            "hit@15": round(hits_15_overall / n, 4),
+            "hit@15_count": f"{hits_15_overall}/{n}",
             "mrr": round(mrr_overall / n, 4)
         },
         "late_in_old_chunk (blind spot)": {
             "n": count_late,
-            "hit@5": round(hits_late / count_late, 4) if count_late else 0,
+            "hit@1": f"{hits_1_late}/{count_late} ({round(hits_1_late / count_late, 4) if count_late else 0})",
+            "hit@5": round(hits_5_late / count_late, 4) if count_late else 0,
+            "hit@5_count": f"{hits_5_late}/{count_late}",
+            "hit@15": round(hits_15_late / count_late, 4) if count_late else 0,
+            "hit@15_count": f"{hits_15_late}/{count_late}",
             "mrr": round(mrr_late / count_late, 4) if count_late else 0
         },
         "early_in_old_chunk": {
             "n": count_early,
-            "hit@5": round(hits_early / count_early, 4) if count_early else 0,
+            "hit@1": f"{hits_1_early}/{count_early} ({round(hits_1_early / count_early, 4) if count_early else 0})",
+            "hit@5": round(hits_5_early / count_early, 4) if count_early else 0,
+            "hit@5_count": f"{hits_5_early}/{count_early}",
+            "hit@15": round(hits_15_early / count_early, 4) if count_early else 0,
+            "hit@15_count": f"{hits_15_early}/{count_early}",
             "mrr": round(mrr_early / count_early, 4) if count_early else 0
         }
     }
@@ -197,7 +277,7 @@ def evaluate_mode(mode_func, questions: List[Dict[str, Any]], top_k: int = 5) ->
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--questions", default="eval_questions.json", help="Path to questions file")
-    parser.add_argument("--label", default="baseline", help="Experiment label (e.g., baseline, token_chunked)")
+    parser.add_argument("--label", default="tokenaware", help="Experiment label (e.g., baseline, tokenaware)")
     parser.add_argument("--outdir", default="results", help="Directory to save eval results")
     args = parser.parse_args()
 
@@ -207,19 +287,26 @@ def main():
         questions = json.load(f)
 
     # 1. Validate anchors
-    try:
-        all_chunks = load_all_chunk_texts()
-        check_anchors(questions, all_chunks)
-    except NotImplementedError:
-        print("Bo qua kiem tra anchor do chua noi load_all_chunk_texts.")
+    all_chunks = load_all_chunk_texts()
+    check_anchors(questions, all_chunks)
 
-    print(f"\n[EVALUATION] Bat dau do dac danh gia cho nhan: [{args.label}] ...")
+    # 2. Random baseline for current pool
+    random_base = compute_random_baseline(questions, all_chunks)
+    print(f"\n[RANDOM BASELINE] Pool trung binh: {len(all_chunks)/7:.1f} chunks/ticker")
+    print(f"   Random Hit@1:  {random_base['hit@1'] * 100:.2f}%")
+    print(f"   Random Hit@5:  {random_base['hit@5'] * 100:.2f}%")
+    print(f"   Random Hit@15: {random_base['hit@15'] * 100:.2f}%")
+    print(f"   Random MRR:    {random_base['mrr']:.4f}")
+
+    print(f"\n[EVALUATION] Bat dau do dac danh gia cho nhan: [{args.label}] (k=5 va k=15) ...")
 
     results = {
         "label": args.label,
-        "dense": evaluate_mode(dense_retrieve, questions),
-        "bm25": evaluate_mode(bm25_retrieve, questions),
-        "hybrid_rrf": evaluate_mode(hybrid_retrieve, questions)
+        "total_chunks_in_pool": len(all_chunks),
+        "random_baseline": random_base,
+        "dense": evaluate_mode(dense_retrieve, questions, top_k=15),
+        "bm25": evaluate_mode(bm25_retrieve, questions, top_k=15),
+        "hybrid_rrf": evaluate_mode(hybrid_retrieve, questions, top_k=15)
     }
 
     out_file = os.path.join(args.outdir, f"retrieval_eval_{args.label}.json")
