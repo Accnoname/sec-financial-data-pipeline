@@ -199,13 +199,13 @@ def build_sec_pipeline_dag(force: bool = False) -> PipelineDAG:
     # Step 5: Gold Semantic Chunking
     t5 = Task(
         task_id="step_5_chunk_risk_factors",
-        name="Cat doan semantic chunking nạp Tang Gold",
+        name="Cat doan tokenizer-aware chunking nap Tang Gold",
         fn=chunk_all_risk_factors,
         max_retries=2,
         post_gate=lambda: QualityGate.assert_parquet_schema(
             PRIMARY_DIR / "chunks" / "all_chunks.parquet",
             expected_columns={"chunk_id", "ticker", "year", "text", "word_count"},
-            min_rows=200,
+            min_rows=800,
         ),
     )
     dag.add_task(t5, upstream_ids=["step_4_extract_risk_factors"])
@@ -219,7 +219,7 @@ def build_sec_pipeline_dag(force: bool = False) -> PipelineDAG:
         post_gate=lambda: QualityGate.assert_vector_collection(
             CURATED_DIR / "vector_db",
             collection_name="sec_risk_factors",
-            min_vectors=200,
+            min_vectors=800,
         ),
     )
     dag.add_task(t6, upstream_ids=["step_5_chunk_risk_factors"])

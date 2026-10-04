@@ -113,7 +113,27 @@ def test_curated_vector_db():
     client = chromadb.PersistentClient(path=str(vector_db_dir), settings=Settings(anonymized_telemetry=False))
     col = client.get_collection("sec_risk_factors")
     count = col.count()
-    assert count >= 260, f"Số vector trong ChromaDB quá ít: {count}"
+    assert count >= 900, f"Số vector trong ChromaDB quá ít: {count}"
+
+
+def test_gold_chunks_fit_embedding_context_window():
+    """Data Contract: Khong chunk nao vuot qua max_seq_length (256 tokens) cua model embedding"""
+    from sentence_transformers import SentenceTransformer
+
+    unified_parquet = DATA_DIR / "03_primary" / "chunks" / "all_chunks.parquet"
+    df = pd.read_parquet(unified_parquet)
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    max_limit = model.max_seq_length
+
+    over_limit = []
+    for _, row in df.iterrows():
+        token_len = len(model.tokenizer.encode(row["text"], truncation=False))
+        if token_len > max_limit:
+            over_limit.append((row["chunk_id"], token_len))
+
+    assert len(over_limit) == 0, (
+        f"Vi pham Data Contract: {len(over_limit)} chunks vuot qua {max_limit} tokens: {over_limit[:5]}"
+    )
 
 
 def test_rag_prompt_construction():

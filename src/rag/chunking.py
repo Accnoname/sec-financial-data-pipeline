@@ -8,16 +8,108 @@ from src.common.logger import get_logger
 
 logger = get_logger("rag_chunking")
 
+_TOKENIZER = None
 
-def split_into_chunks(text: str, chunk_size: int = 500, chunk_overlap: int = 100) -> list[str]:
-    """Cắt văn bản thành các chunks có độ dài chunk_size từ, gối đầu chunk_overlap từ"""
-    words = text.split()
-    if not words:
+
+def get_tokenizer():
+    """Lazy-loads tokenizer to prevent overhead on package import."""
+    global _TOKENIZER
+    if _TOKENIZER is None:
+        from sentence_transformers import SentenceTransformer
+        _TOKENIZER = SentenceTransformer("all-MiniLM-L6-v2").tokenizer
+    return _TOKENIZER
+
+
+def split_into_chunks(
+    text: str,
+    max_tokens: int = 210,
+    overlap_tokens: int = 40,
+    chunk_size: int | None = None,
+    chunk_overlap: int | None = None,
+) -> list[str]:
+    """
+    Tokenizer-aware sliding window chunking preserving sentence boundaries.
+    Guarantees 100% of chunks fit within the 256-token limit of all-MiniLM-L6-v2.
+    Also supports legacy word-based chunking if chunk_size is explicitly provided.
+    """
+    if chunk_size is not None:
+        words = text.split()
+        if not words:
+            return []
+        if len(words) <= chunk_size:
+            return [" ".join(words)]
+        overlap = chunk_overlap if chunk_overlap is not None else 100
+        step = chunk_size - overlap
+        return [" ".join(words[i : i + chunk_size]) for i in range(0, len(words), step)]
+
+    text = text.strip()
+    if not text:
         return []
-    if len(words) <= chunk_size:
-        return [" ".join(words)]
-    step = chunk_size - chunk_overlap
-    return [" ".join(words[i: i + chunk_size]) for i in range(0, len(words), step)]
+
+    tokenizer = get_tokenizer()
+
+    # Split on sentence boundaries
+    sentence_delimiters = re.compile(r'(?<=[.!?])\s+(?=[A-Z0-9\(\"\'])|(?<=\n)\s*(?=\S)')
+    raw_sentences = [s.strip() for s in sentence_delimiters.split(text) if s.strip()]
+
+    sentences = []
+    for s in raw_sentences:
+        s_tokens = len(tokenizer.encode(s, truncation=False))
+        if s_tokens <= max_tokens:
+            sentences.append(s)
+        else:
+            words = s.split()
+            current_sub = []
+            for w in words:
+                current_sub.append(w)
+                if len(tokenizer.encode(" ".join(current_sub), truncation=False)) >= max_tokens - 10:
+                    sentences.append(" ".join(current_sub))
+                    current_sub = []
+            if current_sub:
+                sentences.append(" ".join(current_sub))
+
+    chunks = []
+    current_sentences = []
+    current_tokens = 0
+
+    for s in sentences:
+        s_len = len(tokenizer.encode(s, truncation=False))
+        if current_sentences and (current_tokens + s_len > max_tokens):
+            chunks.append(" ".join(current_sentences))
+
+            overlap_sentences = []
+            overlap_count = 0
+            for prev_s in reversed(current_sentences):
+                p_len = len(tokenizer.encode(prev_s, truncation=False))
+                if overlap_count + p_len <= overlap_tokens or not overlap_sentences:
+                    overlap_sentences.insert(0, prev_s)
+                    overlap_count += p_len
+                else:
+                    break
+            current_sentences = list(overlap_sentences)
+            current_tokens = overlap_count
+
+        current_sentences.append(s)
+        current_tokens += s_len
+
+    if current_sentences:
+        chunks.append(" ".join(current_sentences))
+
+    # Strict Data Contract: Hard ceiling of 240 tokens (below model's 256 limit)
+    final_chunks = []
+    for c in chunks:
+        tok_len = len(tokenizer.encode(c, truncation=False))
+        if tok_len <= 240:
+            final_chunks.append(c)
+        else:
+            words = c.split()
+            mid = len(words) // 2
+            c1 = " ".join(words[: mid + 15])
+            c2 = " ".join(words[mid - 15 :])
+            final_chunks.append(c1)
+            final_chunks.append(c2)
+
+    return final_chunks
 
 
 def chunk_for_rag(ticker: str = "GOOGL", year: int | None = None) -> Path:

@@ -1,0 +1,202 @@
+[
+  {
+    "id": 1,
+    "ticker": "NVDA",
+    "query": "What are NVIDIA's risks regarding reliance on third-party foundries like TSMC?",
+    "expected_chunk_id": "NVDA_2026_RF_0004",
+    "keyword": "foundry",
+    "total_tokens": 608,
+    "keyword_token_position": 302,
+    "is_tail_target": true
+  },
+  {
+    "id": 2,
+    "ticker": "NVDA",
+    "query": "What risks does NVIDIA face regarding US government export controls to China?",
+    "expected_chunk_id": "NVDA_2026_RF_0001",
+    "keyword": "export",
+    "total_tokens": 592,
+    "keyword_token_position": 590,
+    "is_tail_target": true
+  },
+  {
+    "id": 3,
+    "ticker": "NVDA",
+    "query": "How do supply chain disruptions impact NVIDIA's gross margins?",
+    "expected_chunk_id": "NVDA_2026_RF_0005",
+    "keyword": "gross margin",
+    "total_tokens": 595,
+    "keyword_token_position": 505,
+    "is_tail_target": true
+  },
+  {
+    "id": 4,
+    "ticker": "AAPL",
+    "query": "How does Apple manage risks related to concentration of manufacturing in Asia?",
+    "expected_chunk_id": "AAPL_2025_RF_0001",
+    "keyword": "manufacturing",
+    "total_tokens": 653,
+    "keyword_token_position": 309,
+    "is_tail_target": true
+  },
+  {
+    "id": 5,
+    "ticker": "AAPL",
+    "query": "What antitrust and regulatory risks affect the Apple App Store commission?",
+    "expected_chunk_id": "AAPL_2025_RF_0018",
+    "keyword": "App Store",
+    "total_tokens": 624,
+    "keyword_token_position": 410,
+    "is_tail_target": true
+  },
+  {
+    "id": 6,
+    "ticker": "AAPL",
+    "query": "What are Apple's risks concerning dependency on third-party cellular and wireless components?",
+    "expected_chunk_id": "AAPL_2025_RF_0001",
+    "keyword": "cellular",
+    "total_tokens": 653,
+    "keyword_token_position": 469,
+    "is_tail_target": true
+  },
+  {
+    "id": 7,
+    "ticker": "MSFT",
+    "query": "What risks does Microsoft identify concerning its strategic partnership with OpenAI?",
+    "expected_chunk_id": "MSFT_2026_RF_0001",
+    "keyword": "OpenAI",
+    "total_tokens": 605,
+    "keyword_token_position": 506,
+    "is_tail_target": true
+  },
+  {
+    "id": 8,
+    "ticker": "MSFT",
+    "query": "How do cybersecurity incidents and unauthorized access threaten Microsoft cloud services?",
+    "expected_chunk_id": "MSFT_2026_RF_0003",
+    "keyword": "cybersecurity",
+    "total_tokens": 602,
+    "keyword_token_position": 414,
+    "is_tail_target": true
+  },
+  {
+    "id": 9,
+    "ticker": "MSFT",
+    "query": "What regulatory challenges does Microsoft face in international cloud market competition?",
+    "expected_chunk_id": "MSFT_2026_RF_0001",
+    "keyword": "cloud",
+    "total_tokens": 605,
+    "keyword_token_position": 120,
+    "is_tail_target": false
+  },
+  {
+    "id": 10,
+    "ticker": "GOOGL",
+    "query": "What antitrust lawsuits does Alphabet face regarding digital search and advertising monopolies?",
+    "expected_chunk_id": "GOOGL_2025_RF_0007",
+    "keyword": "antitrust",
+    "total_tokens": 621,
+    "keyword_token_position": 352,
+    "is_tail_target": true
+  },
+  {
+    "id": 11,
+    "ticker": "GOOGL",
+    "query": "How do changes in user privacy settings and cookies impact Google ad revenue?",
+    "expected_chunk_id": "GOOGL_2025_RF_0001",
+    "keyword": "advertising",
+    "total_tokens": 612,
+    "keyword_token_position": 140,
+    "is_tail_target": false
+  },
+  {
+    "id": 12,
+    "ticker": "GOOGL",
+    "query": "What risks does Alphabet face from emerging generative AI search alternatives?",
+    "expected_chunk_id": "GOOGL_2025_RF_0004",
+    "keyword": "artificial intelligence",
+    "total_tokens": 589,
+    "keyword_token_position": 482,
+    "is_tail_target": true
+  },
+  {
+    "id": 13,
+    "ticker": "AMZN",
+    "query": "What operational risks does Amazon face in maintaining AWS data centers and power infrastructure?",
+    "expected_chunk_id": "AMZN_2025_RF_0001",
+    "keyword": "infrastructure",
+    "total_tokens": 638,
+    "keyword_token_position": 490,
+    "is_tail_target": true
+  },
+  {
+    "id": 14,
+    "ticker": "AMZN",
+    "query": "How do third-party seller liabilities on Amazon marketplace create legal exposure?",
+    "expected_chunk_id": "AMZN_2025_RF_0004",
+    "keyword": "seller",
+    "total_tokens": 602,
+    "keyword_token_position": 512,
+    "is_tail_target": true
+  },
+  {
+    "id": 15,
+    "ticker": "AMZN",
+    "query": "What risks impact Amazon's global transportation and fulfillment logistics network?",
+    "expected_chunk_id": "AMZN_2025_RF_0001",
+    "keyword": "fulfillment",
+    "total_tokens": 638,
+    "keyword_token_position": 320,
+    "is_tail_target": true
+  },
+  {
+    "id": 16,
+    "ticker": "TSLA",
+    "query": "What regulatory hurdles and safety investigations threaten Tesla Full Self-Driving FSD software?",
+    "expected_chunk_id": "TSLA_2025_RF_0002",
+    "keyword": "autonomous",
+    "total_tokens": 599,
+    "keyword_token_position": 460,
+    "is_tail_target": true
+  },
+  {
+    "id": 17,
+    "ticker": "TSLA",
+    "query": "How do volatile raw material prices for lithium and cobalt impact Tesla vehicle production?",
+    "expected_chunk_id": "TSLA_2025_RF_0001",
+    "keyword": "raw material",
+    "total_tokens": 598,
+    "keyword_token_position": 380,
+    "is_tail_target": true
+  },
+  {
+    "id": 18,
+    "ticker": "TSLA",
+    "query": "What key-person dependency risks does Tesla have on Chief Executive Elon Musk?",
+    "expected_chunk_id": "TSLA_2025_RF_0010",
+    "keyword": "Musk",
+    "total_tokens": 612,
+    "keyword_token_position": 290,
+    "is_tail_target": true
+  },
+  {
+    "id": 19,
+    "ticker": "META",
+    "query": "What financial losses and scrutiny does Meta encounter in its Reality Labs metaverse segment?",
+    "expected_chunk_id": "META_2025_RF_0002",
+    "keyword": "Reality Labs",
+    "total_tokens": 618,
+    "keyword_token_position": 440,
+    "is_tail_target": true
+  },
+  {
+    "id": 20,
+    "ticker": "META",
+    "query": "What regulations and lawsuits target Meta regarding youth safety and user privacy?",
+    "expected_chunk_id": "META_2025_RF_0020",
+    "keyword": "youth",
+    "total_tokens": 645,
+    "keyword_token_position": 350,
+    "is_tail_target": true
+  }
+]
