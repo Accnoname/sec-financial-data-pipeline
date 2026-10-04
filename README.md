@@ -99,9 +99,9 @@ Financial disclosures for a given firm are typically filed once per fiscal year.
 
 ### 4. Financial AI RAG with Full Citation Trail
 - Extracts narrative risk disclosures from Item 1A, stripping boilerplate SEC headers, page counters, and XBRL markup.
-- Segments text into 500-word sliding windows with 100-word overlap to preserve semantic continuity across paragraph boundaries.
-- Employs SentenceTransformers (`all-MiniLM-L6-v2`) to produce 384-dimensional dense vectors stored in ChromaDB.
-- When queried, retrieves the top 5 semantically relevant chunks and passes them to Gemini AI with strict citation instructions, outputting grounded answers accompanied by references to exact Markdown and raw HTML source files.
+- Segments text using tokenizer-aware chunking (target ≤ 210 tokens, 40-token overlap, hard ceiling 240 tokens) to guarantee zero truncation by the embedding model.
+- Employs SentenceTransformers (`all-MiniLM-L6-v2`) to produce 384-dimensional dense vectors stored in ChromaDB alongside an exact-match BM25 index and Reciprocal Rank Fusion (RRF).
+- When queried, retrieves top relevant chunks and passes them to Gemini AI with strict citation instructions, outputting grounded answers accompanied by references to exact Markdown and raw HTML source files.
 
 ---
 
@@ -113,7 +113,7 @@ Financial disclosures for a given firm are typically filed once per fiscal year.
 | **Bronze** | `data/01_raw/sec_filings/{TICKER}/` | HTML / JSON | Raw Form 10-K disclosures (1-8 MB each) and filing metadata state. |
 | **Silver** | `data/02_staging/companies_clean.parquet` | Parquet (Snappy) | Normalized schema: `cik` (String), `ticker` (String), `name` (String), `exchange` (String), `is_major` (Boolean). |
 | **Silver** | `data/02_staging/sec_filings/{TICKER}/` | Markdown | Extracted and normalized Item 1A Risk Factors text. |
-| **Gold** | `data/03_primary/chunks/` | Parquet / JSON | Schema: `chunk_id` (String), `ticker` (String), `year` (Int64), `section` (String), `chunk_index` (Int64), `text` (String), `word_count` (Int64). Total: 262 chunks. |
+| **Gold** | `data/03_primary/chunks/` | Parquet / JSON | Schema: `chunk_id` (String), `ticker` (String), `year` (Int64), `section` (String), `chunk_index` (Int64), `text` (String), `token_count` (Int64), `word_count` (Int64). Total: 925 chunks (≤240 tokens). |
 | **Curated**| `data/04_curated/vector_db/` | ChromaDB / Vector | Persistent cosine vector collection (`sec_risk_factors`). |
 
 ---
@@ -236,6 +236,40 @@ python run.py 4 MSFT      # Step 4: Extract Item 1A for Microsoft only
 python run.py 5           # Step 5: Perform semantic chunking into Gold Parquet
 python run.py 6           # Step 6: Generate embeddings and build ChromaDB index
 ```
+
+---
+
+## Empirical Retrieval Evaluation & Benchmark Suite
+
+### 1. Methodology & Authorship Disclosure
+To objectively evaluate retrieval performance beyond qualitative inspection, the platform includes an automated evaluation harness (`eval_retrieval.py`):
+- **Benchmark Suite:** 20 ground-truth questions evaluating Item 1A disclosures across 7 companies (AAPL, AMZN, GOOGL, META, MSFT, NVDA, TSLA), with 10 questions targeting information formerly located beyond the 256-token mark (`late_in_old_chunk: true`) and 10 questions in the early window (`late_in_old_chunk: false`).
+- **Authorship Disclosure:** *Questions drafted with AI assistance, anchors verified verbatim against Silver markdown.*
+- **Evaluation Metrics:** Hit@k (exact question count and percentage), Mean Reciprocal Rank (MRR), and 500-trial Monte Carlo Random Baselines.
+
+### 2. Root Cause Discovery & Data Contract
+- **The Silent Truncation Bug:** In the legacy 500-word sliding window implementation, **257 out of 262 chunks (98.1%) exceeded the 256-token context limit** of `all-MiniLM-L6-v2`. Any text positioned beyond token index 256 was silently dropped during vectorization, creating a blind spot.
+- **The Fix:** Migrated to tokenizer-aware chunking (`target_tokens=210`, `overlap_tokens=40`, `max_tokens=240`), enforced by an automated data contract test (`tests/test_pipeline.py::test_gold_chunks_fit_embedding_context_window`) that fails if any chunk in the Gold layer exceeds 256 tokens.
+
+### 3. Head-to-Head Retrieval Results
+
+| Configuration & Metric | Random Baseline | Dense (`all-MiniLM-L6-v2`) | BM25 Lexical | Hybrid (RRF $k=60$) |
+| :--- | :---: | :---: | :---: | :---: |
+| **Baseline Chunks (500w, 262 Pool)** | | | | |
+| Overall Hit@5 (~3,000 tokens) | 3.6 / 20 (18.1%) | 14 / 20 (70.0%) | **18 / 20 (90.0%)** | 17 / 20 (85.0%) |
+| Late (Blind Spot) Hit@5 | - | 6 / 10 | 9 / 10 | 8 / 10 |
+| Early Hit@5 | - | 8 / 10 | 9 / 10 | 9 / 10 |
+| MRR | 0.0849 | 0.5375 | **0.6975** | 0.6417 |
+| **Token-Aware Chunks (≤220t, 925 Pool)** | | | | |
+| Overall Hit@5 (~1,000 tokens) | 1.0 / 20 (4.9%) | 12 / 20 (60.0%) | 13 / 20 (65.0%) | **13 / 20 (65.0%)** |
+| Overall Hit@15 (~3,000 tokens, Token-Budget Normalized) | 3.1 / 20 (15.6%) | **18 / 20 (90.0%)** | 16 / 20 (80.0%) | **18 / 20 (90.0%)** |
+| Late (Former Blind Spot) Hit@15 | - | **9 / 10** | 7 / 10 | **9 / 10** |
+| Early Hit@15 | - | 9 / 10 | 9 / 10 | 9 / 10 |
+| MRR | 0.0337 | 0.4010 | **0.4326** | 0.4297 |
+
+### 4. Limitations of the Evaluation
+1. **Non-Unique Ground-Truth Chunks:** SEC Form 10-K filings frequently discuss interconnected risks (e.g., cybersecurity threats, supply chain dependencies, macroeconomic headwinds) across multiple distinct paragraphs. A retrieval "miss" against a specific anchor text does not necessarily mean the retrieved chunk was irrelevant or that an LLM would fail to answer correctly—only that it did not match that specific verbatim reference string. This affects absolute accuracy figures, though relative comparisons across algorithms remain sound.
+2. **Boundary Overlap Effects:** The 40-token sliding window overlap ensures continuity, but means certain anchor texts may appear in two adjacent chunks. While this slightly elevates retrieval probabilities, the effect is uniform across all models and baseline calculations.
 
 ---
 
