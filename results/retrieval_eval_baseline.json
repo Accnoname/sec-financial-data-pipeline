@@ -1,0 +1,54 @@
+{
+  "label": "baseline",
+  "dense": {
+    "overall": {
+      "n": 20,
+      "hit@5": 0.7,
+      "mrr": 0.5375
+    },
+    "late_in_old_chunk (blind spot)": {
+      "n": 10,
+      "hit@5": 0.6,
+      "mrr": 0.5
+    },
+    "early_in_old_chunk": {
+      "n": 10,
+      "hit@5": 0.8,
+      "mrr": 0.575
+    }
+  },
+  "bm25": {
+    "overall": {
+      "n": 20,
+      "hit@5": 0.9,
+      "mrr": 0.6975
+    },
+    "late_in_old_chunk (blind spot)": {
+      "n": 10,
+      "hit@5": 0.9,
+      "mrr": 0.62
+    },
+    "early_in_old_chunk": {
+      "n": 10,
+      "hit@5": 0.9,
+      "mrr": 0.775
+    }
+  },
+  "hybrid_rrf": {
+    "overall": {
+      "n": 20,
+      "hit@5": 0.85,
+      "mrr": 0.6417
+    },
+    "late_in_old_chunk (blind spot)": {
+      "n": 10,
+      "hit@5": 0.8,
+      "mrr": 0.6
+    },
+    "early_in_old_chunk": {
+      "n": 10,
+      "hit@5": 0.9,
+      "mrr": 0.6833
+    }
+  }
+}

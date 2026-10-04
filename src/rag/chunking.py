@@ -112,7 +112,12 @@ def split_into_chunks(
     return final_chunks
 
 
-def chunk_for_rag(ticker: str = "GOOGL", year: int | None = None) -> Path:
+def chunk_for_rag(
+    ticker: str = "GOOGL",
+    year: int | None = None,
+    chunk_size: int | None = None,
+    chunk_overlap: int | None = None,
+) -> Path:
     """Cắt đoạn và tạo metadata cho một công ty cụ thể"""
     ticker = ticker.upper().strip()
     ticker_dir = STAGING_DIR / "sec_filings" / ticker
@@ -129,7 +134,11 @@ def chunk_for_rag(ticker: str = "GOOGL", year: int | None = None) -> Path:
         year = int(m.group(1)) if m else 2025
 
     content = md_file.read_text(encoding="utf-8")
-    raw_chunks = split_into_chunks(content)
+    raw_chunks = split_into_chunks(
+        content,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+    )
 
     records = [
         {
@@ -159,7 +168,10 @@ def chunk_for_rag(ticker: str = "GOOGL", year: int | None = None) -> Path:
     return out_parquet
 
 
-def chunk_all_risk_factors() -> list[Path]:
+def chunk_all_risk_factors(
+    chunk_size: int | None = None,
+    chunk_overlap: int | None = None,
+) -> list[Path]:
     """Cắt đoạn cho toàn bộ công ty có trong Tầng Silver (02_staging) và tạo all_chunks.parquet"""
     staging_filings = STAGING_DIR / "sec_filings"
     if not staging_filings.exists():
@@ -179,7 +191,11 @@ def chunk_all_risk_factors() -> list[Path]:
         year = int(m.group(1)) if m else 2025
 
         content = md_path.read_text(encoding="utf-8")
-        raw_chunks = split_into_chunks(content)
+        raw_chunks = split_into_chunks(
+            content,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+        )
 
         records = [
             {

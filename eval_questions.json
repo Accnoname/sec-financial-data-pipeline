@@ -1,0 +1,182 @@
+[
+  {
+    "id": 1,
+    "ticker": "NVDA",
+    "year": 2026,
+    "late_in_old_chunk": true,
+    "query": "Dependency on Taiwan-based external foundries for wafer fabrication",
+    "anchor_text": "depend on foundries to manufacture our semiconductor wafers",
+    "note": "Paraphrase: hỏi 'external foundries' trong khi text ghi 'depend on foundries to manufacture our semiconductor wafers'"
+  },
+  {
+    "id": 2,
+    "ticker": "NVDA",
+    "year": 2026,
+    "late_in_old_chunk": false,
+    "query": "Impact of US export control regulations and licensing on computing GPUs",
+    "anchor_text": "The export controls applicable to China are complex and address",
+    "note": "Keyword-heavy: bắt trực tiếp các quy định kiểm soát xuất khẩu"
+  },
+  {
+    "id": 3,
+    "ticker": "AAPL",
+    "year": 2025,
+    "late_in_old_chunk": true,
+    "query": "Regulatory changes and legal scrutiny regarding digital storefront commission rates",
+    "anchor_text": "investigations in Europe and other jurisdictions relating to App Store terms and conditions",
+    "note": "Paraphrase: hỏi 'digital storefront' thay vì 'App Store'"
+  },
+  {
+    "id": 4,
+    "ticker": "AAPL",
+    "year": 2025,
+    "late_in_old_chunk": false,
+    "query": "Geographic concentration of manufacturing partners and final assembly in Asia",
+    "anchor_text": "partners primarily located in Asia, for final assembly of substantially all",
+    "note": "Keyword & concept: rủi ro chuỗi cung ứng tập trung tại châu Á"
+  },
+  {
+    "id": 5,
+    "ticker": "MSFT",
+    "year": 2026,
+    "late_in_old_chunk": true,
+    "query": "Dependence on strategic third-party AI partnerships and exclusive infrastructure costs",
+    "anchor_text": "cost structure for AI products and services is subject to significant uncertainty, including with respect to model training and inference costs",
+    "note": "Late chunk: chi phí hạ tầng AI và mô hình huấn luyện"
+  },
+  {
+    "id": 6,
+    "ticker": "MSFT",
+    "year": 2026,
+    "late_in_old_chunk": false,
+    "query": "Exposure to sophisticated cyberattacks and persistent threat actors",
+    "anchor_text": "including nation-states, state-sponsored organizations, or cybercriminal groups",
+    "note": "Cybersecurity risk"
+  },
+  {
+    "id": 7,
+    "ticker": "GOOGL",
+    "year": 2025,
+    "late_in_old_chunk": true,
+    "query": "Transition from traditional search ad clicks to conversational generative responses",
+    "anchor_text": "frontier generative AI models and building AI capabilities into products and services",
+    "note": "Paraphrase: rủi ro AI tạo sinh thay đổi hành vi tìm kiếm"
+  },
+  {
+    "id": 8,
+    "ticker": "GOOGL",
+    "year": 2025,
+    "late_in_old_chunk": false,
+    "query": "Antitrust litigation regarding distribution agreements and default search status",
+    "anchor_text": "several antitrust lawsuits about aspects of our business",
+    "note": "Antitrust / Lawsuit focus"
+  },
+  {
+    "id": 9,
+    "ticker": "AMZN",
+    "year": 2025,
+    "late_in_old_chunk": true,
+    "query": "Server infrastructure obsolescence and data center energy availability constraints",
+    "anchor_text": "rely on a limited group of suppliers for semiconductor",
+    "note": "AWS Infrastructure & semiconductor hardware constraints"
+  },
+  {
+    "id": 10,
+    "ticker": "AMZN",
+    "year": 2025,
+    "late_in_old_chunk": false,
+    "query": "Labor unionization efforts and workforce wage pressures in logistics hubs",
+    "anchor_text": "subject to labor union efforts to organize groups of our employees",
+    "note": "Fulfillment & Labor risks"
+  },
+  {
+    "id": 11,
+    "ticker": "META",
+    "year": 2025,
+    "late_in_old_chunk": true,
+    "query": "Platform tracking restrictions and mobile operating system policy alterations",
+    "anchor_text": "changes to its iOS operating system that reduce our and other iOS developers",
+    "note": "Privacy & Ad measurement headwinds"
+  },
+  {
+    "id": 12,
+    "ticker": "META",
+    "year": 2025,
+    "late_in_old_chunk": false,
+    "query": "Long-term capital expenditures and monetization horizon of Reality Labs metaverse",
+    "anchor_text": "may not be successful in our Reality Labs strategy and investments",
+    "note": "Reality labs investment"
+  },
+  {
+    "id": 13,
+    "ticker": "TSLA",
+    "year": 2025,
+    "late_in_old_chunk": true,
+    "query": "Regulatory validation and liability exposure of unsupervised Full Self-Driving software",
+    "anchor_text": "collisions, whether involving Robotaxi vehicles or customer vehicles with driver assistance",
+    "note": "Autopilot / FSD regulatory & legal scrutiny"
+  },
+  {
+    "id": 14,
+    "ticker": "TSLA",
+    "year": 2025,
+    "late_in_old_chunk": false,
+    "query": "Volatile price reductions and downward pressure on automotive gross margins",
+    "anchor_text": "lower vehicle unit sales, price reductions, revenue shortfalls, loss of customers",
+    "note": "Margin pressure & price cuts"
+  },
+  {
+    "id": 15,
+    "ticker": "NVDA",
+    "year": 2026,
+    "late_in_old_chunk": true,
+    "query": "Packaging capacity bottlenecks for CoWoS and advanced silicon assembly",
+    "anchor_text": "issues in design, fabrication, packaging, materials, bugs and/or use within a system",
+    "note": "Hardware packaging bottleneck"
+  },
+  {
+    "id": 16,
+    "ticker": "AAPL",
+    "year": 2025,
+    "late_in_old_chunk": false,
+    "query": "Foreign currency exchange rate fluctuations impacting international revenues",
+    "anchor_text": "fluctuations in foreign exchange rates; inflation and other macroeconomic pressures",
+    "note": "FX Headwinds"
+  },
+  {
+    "id": 17,
+    "ticker": "MSFT",
+    "year": 2026,
+    "late_in_old_chunk": true,
+    "query": "Complex integration and regulatory remedies related to large gaming acquisitions",
+    "anchor_text": "could cause an impairment of goodwill or intangibles. We have recorded",
+    "note": "Activision Blizzard goodwill impairment risk"
+  },
+  {
+    "id": 18,
+    "ticker": "GOOGL",
+    "year": 2025,
+    "late_in_old_chunk": false,
+    "query": "European Union Digital Markets Act compliance and interoperability obligations",
+    "anchor_text": "governments around the world have proposed and adopted a",
+    "note": "EU DMA and regulatory compliance"
+  },
+  {
+    "id": 19,
+    "ticker": "AMZN",
+    "year": 2025,
+    "late_in_old_chunk": true,
+    "query": "Counterfeit merchandise and merchant liability claims on third-party marketplace",
+    "anchor_text": "China-based sellers account for significant portions of our third-party",
+    "note": "Marketplace seller risk"
+  },
+  {
+    "id": 20,
+    "ticker": "META",
+    "year": 2025,
+    "late_in_old_chunk": false,
+    "query": "Teen safety inquiries and mental health regulatory requirements on social platforms",
+    "anchor_text": "people's safety or well-being on- or offline, including with respect to younger users",
+    "note": "Teen safety & social media regulation"
+  }
+]
