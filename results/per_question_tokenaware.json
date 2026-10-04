@@ -1,0 +1,182 @@
+[
+  {
+    "id": 1,
+    "ticker": "NVDA",
+    "late": "LATE",
+    "dense_rank": 3,
+    "bm25_rank": 1,
+    "hyb_rank": 1,
+    "query": "Dependency on Taiwan-based external foundries for wafer fabrication"
+  },
+  {
+    "id": 2,
+    "ticker": "NVDA",
+    "late": "EARLY",
+    "dense_rank": 15,
+    "bm25_rank": null,
+    "hyb_rank": null,
+    "query": "Impact of US export control regulations and licensing on computing GPUs"
+  },
+  {
+    "id": 3,
+    "ticker": "AAPL",
+    "late": "LATE",
+    "dense_rank": 13,
+    "bm25_rank": null,
+    "hyb_rank": null,
+    "query": "Regulatory changes and legal scrutiny regarding digital storefront commission rates"
+  },
+  {
+    "id": 4,
+    "ticker": "AAPL",
+    "late": "EARLY",
+    "dense_rank": 1,
+    "bm25_rank": 1,
+    "hyb_rank": 1,
+    "query": "Geographic concentration of manufacturing partners and final assembly in Asia"
+  },
+  {
+    "id": 5,
+    "ticker": "MSFT",
+    "late": "LATE",
+    "dense_rank": 2,
+    "bm25_rank": 2,
+    "hyb_rank": 2,
+    "query": "Dependence on strategic third-party AI partnerships and exclusive infrastructure costs"
+  },
+  {
+    "id": 6,
+    "ticker": "MSFT",
+    "late": "EARLY",
+    "dense_rank": 1,
+    "bm25_rank": 1,
+    "hyb_rank": 1,
+    "query": "Exposure to sophisticated cyberattacks and persistent threat actors"
+  },
+  {
+    "id": 7,
+    "ticker": "GOOGL",
+    "late": "LATE",
+    "dense_rank": 13,
+    "bm25_rank": 8,
+    "hyb_rank": 6,
+    "query": "Transition from traditional search ad clicks to conversational generative responses"
+  },
+  {
+    "id": 8,
+    "ticker": "GOOGL",
+    "late": "EARLY",
+    "dense_rank": 1,
+    "bm25_rank": 1,
+    "hyb_rank": 1,
+    "query": "Antitrust litigation regarding distribution agreements and default search status"
+  },
+  {
+    "id": 9,
+    "ticker": "AMZN",
+    "late": "LATE",
+    "dense_rank": 6,
+    "bm25_rank": 1,
+    "hyb_rank": 2,
+    "query": "Server infrastructure obsolescence and data center energy availability constraints"
+  },
+  {
+    "id": 10,
+    "ticker": "AMZN",
+    "late": "EARLY",
+    "dense_rank": 1,
+    "bm25_rank": 1,
+    "hyb_rank": 1,
+    "query": "Labor unionization efforts and workforce wage pressures in logistics hubs"
+  },
+  {
+    "id": 11,
+    "ticker": "META",
+    "late": "LATE",
+    "dense_rank": 3,
+    "bm25_rank": 5,
+    "hyb_rank": 3,
+    "query": "Platform tracking restrictions and mobile operating system policy alterations"
+  },
+  {
+    "id": 12,
+    "ticker": "META",
+    "late": "EARLY",
+    "dense_rank": 2,
+    "bm25_rank": 2,
+    "hyb_rank": 2,
+    "query": "Long-term capital expenditures and monetization horizon of Reality Labs metaverse"
+  },
+  {
+    "id": 13,
+    "ticker": "TSLA",
+    "late": "LATE",
+    "dense_rank": 1,
+    "bm25_rank": 4,
+    "hyb_rank": 2,
+    "query": "Regulatory validation and liability exposure of unsupervised Full Self-Driving software"
+  },
+  {
+    "id": 14,
+    "ticker": "TSLA",
+    "late": "EARLY",
+    "dense_rank": 10,
+    "bm25_rank": 3,
+    "hyb_rank": 4,
+    "query": "Volatile price reductions and downward pressure on automotive gross margins"
+  },
+  {
+    "id": 15,
+    "ticker": "NVDA",
+    "late": "LATE",
+    "dense_rank": null,
+    "bm25_rank": 3,
+    "hyb_rank": 8,
+    "query": "Packaging capacity bottlenecks for CoWoS and advanced silicon assembly"
+  },
+  {
+    "id": 16,
+    "ticker": "AAPL",
+    "late": "EARLY",
+    "dense_rank": 5,
+    "bm25_rank": 4,
+    "hyb_rank": 5,
+    "query": "Foreign currency exchange rate fluctuations impacting international revenues"
+  },
+  {
+    "id": 17,
+    "ticker": "MSFT",
+    "late": "LATE",
+    "dense_rank": 4,
+    "bm25_rank": null,
+    "hyb_rank": 13,
+    "query": "Complex integration and regulatory remedies related to large gaming acquisitions"
+  },
+  {
+    "id": 18,
+    "ticker": "GOOGL",
+    "late": "EARLY",
+    "dense_rank": 3,
+    "bm25_rank": 12,
+    "hyb_rank": 4,
+    "query": "European Union Digital Markets Act compliance and interoperability obligations"
+  },
+  {
+    "id": 19,
+    "ticker": "AMZN",
+    "late": "LATE",
+    "dense_rank": 12,
+    "bm25_rank": null,
+    "hyb_rank": 15,
+    "query": "Counterfeit merchandise and merchant liability claims on third-party marketplace"
+  },
+  {
+    "id": 20,
+    "ticker": "META",
+    "late": "EARLY",
+    "dense_rank": null,
+    "bm25_rank": 13,
+    "hyb_rank": 8,
+    "query": "Teen safety inquiries and mental health regulatory requirements on social platforms"
+  }
+]

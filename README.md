@@ -253,23 +253,31 @@ To objectively evaluate retrieval performance beyond qualitative inspection, the
 
 ### 3. Head-to-Head Retrieval Results
 
-| Configuration & Metric | Random Baseline | Dense (`all-MiniLM-L6-v2`) | BM25 Lexical | Hybrid (RRF $k=60$) |
-| :--- | :---: | :---: | :---: | :---: |
-| **Baseline Chunks (500w, 262 Pool)** | | | | |
-| Overall Hit@5 (~3,000 tokens) | 3.6 / 20 (18.1%) | 14 / 20 (70.0%) | **18 / 20 (90.0%)** | 17 / 20 (85.0%) |
-| Late (Blind Spot) Hit@5 | - | 6 / 10 | 9 / 10 | 8 / 10 |
-| Early Hit@5 | - | 8 / 10 | 9 / 10 | 9 / 10 |
-| MRR | 0.0849 | 0.5375 | **0.6975** | 0.6417 |
-| **Token-Aware Chunks (≤220t, 925 Pool)** | | | | |
-| Overall Hit@5 (~1,000 tokens) | 1.0 / 20 (4.9%) | 12 / 20 (60.0%) | 13 / 20 (65.0%) | **13 / 20 (65.0%)** |
-| Overall Hit@15 (~3,000 tokens, Token-Budget Normalized) | 3.1 / 20 (15.6%) | **18 / 20 (90.0%)** | 16 / 20 (80.0%) | **18 / 20 (90.0%)** |
-| Late (Former Blind Spot) Hit@15 | - | **9 / 10** | 7 / 10 | **9 / 10** |
-| Early Hit@15 | - | 9 / 10 | 9 / 10 | 9 / 10 |
-| MRR | 0.0337 | 0.4010 | **0.4326** | 0.4297 |
+> [!NOTE]
+> **Sample Size & Statistical Significance ($n = 20$):** In a 20-question benchmark, differences of 1 to 4 questions (5%–20%) fall within statistical noise. Results should be interpreted as directional indicators of system behavior rather than proof of superiority.
+
+| Configuration & Metric | Random Baseline | Dense (`all-MiniLM-L6-v2`) | BM25 Lexical | Hybrid (RRF $k=60$) | Best System |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Baseline Chunks (500w, 262 Pool)** | | | | | |
+| Overall Hit@5 (~3,000 tokens) | 3.6 / 20 | 14 / 20 | **18 / 20** | 17 / 20 | **18 / 20** (BM25) |
+| Late (Blind Spot) Hit@5 | - | 6 / 10 | 9 / 10 | 8 / 10 | 9 / 10 (BM25) |
+| Early Hit@5 | - | 8 / 10 | 9 / 10 | 9 / 10 | 9 / 10 (BM25/Hyb) |
+| MRR | 0.0849 | 0.5375 | **0.6975** | 0.6417 | **0.6975** (BM25) |
+| **Token-Aware Chunks (≤240t, 925 Pool)** | | | | | |
+| Overall Hit@5 (~1,000 tokens) | 1.0 / 20 | 12 / 20 | 13 / 20 | 13 / 20 | 13 / 20 (BM25/Hyb) |
+| Overall Hit@15 (~3,000 tokens, Normalized Budget) | 3.1 / 20 | **18 / 20** | 16 / 20 | **18 / 20** | **18 / 20** (Dense/Hyb) |
+| Late (Former Blind Spot) Hit@15 | - | **9 / 10** | 7 / 10 | **9 / 10** | **9 / 10** (Dense/Hyb) |
+| Early Hit@15 | - | 9 / 10 | 9 / 10 | 9 / 10 | 9 / 10 (Tie) |
+| MRR | 0.0337 | 0.4010 | **0.4326** | 0.4297 | **0.4326** (BM25) |
+
+**Key System Takeaways:**
+1. **Dense Recovery:** Sizing chunks to fit the 256-token context limit restored Dense retrieval from 14/20 to 18/20 at equal context budget (~3K tokens), eliminating the truncation blind spot (late questions recovered from 6/10 to 9/10).
+2. **Lexical Trade-off:** BM25 dropped from 18/20 to 16/20 (-2 questions) due to shorter chunks losing surrounding context terms, illustrating a classic chunk-granularity trade-off.
+3. **Best-System Parity:** Rebuilding chunking brought Dense and Hybrid up to match the best pre-fix performance (18/20, previously achieved by BM25 alone), while overall top-tier retrieval remained unchanged at 18/20.
 
 ### 4. Limitations of the Evaluation
 1. **Non-Unique Ground-Truth Chunks:** SEC Form 10-K filings frequently discuss interconnected risks (e.g., cybersecurity threats, supply chain dependencies, macroeconomic headwinds) across multiple distinct paragraphs. A retrieval "miss" against a specific anchor text does not necessarily mean the retrieved chunk was irrelevant or that an LLM would fail to answer correctly—only that it did not match that specific verbatim reference string. This affects absolute accuracy figures, though relative comparisons across algorithms remain sound.
-2. **Boundary Overlap Effects:** The 40-token sliding window overlap ensures continuity, but means certain anchor texts may appear in two adjacent chunks. While this slightly elevates retrieval probabilities, the effect is uniform across all models and baseline calculations.
+2. **Boundary Overlap Effects:** The 40-token sliding window overlap ensures continuity, but means certain anchor texts may appear in two adjacent chunks (verified in 4 out of 20 questions). While this slightly elevates retrieval probabilities, the effect is uniform across all models and baseline calculations.
 
 ---
 
