@@ -1,0 +1,35 @@
+\section*{Phụ Lục: Bảng Chú Giải Thuật Ngữ Kỹ Thuật Chuyên Ngành}
+\addcontentsline{toc}{section}{Phụ Lục: Bảng Chú Giải Thuật Ngữ Kỹ Thuật Chuyên Ngành}
+
+Nhằm hỗ trợ việc tra cứu, chuẩn hóa khái niệm và phục vụ công tác thẩm định kỹ thuật độc lập, Bảng~\ref{tab:glossary_technical_terms} cung cấp định nghĩa chi tiết của các thuật ngữ cốt lõi trong kỹ thuật dữ liệu (Data Engineering) và hệ thống trí tuệ nhân tạo (AI/RAG) được sử dụng xuyên suốt công trình:
+
+\begin{table}[htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\caption{Bảng chú giải các thuật ngữ kỹ thuật chuyên ngành cốt lõi trong đường ống}
+\label{tab:glossary_technical_terms}
+\begin{tabularx}{\textwidth}{p{3.8cm} X}
+\toprule
+\textbf{Thuật Ngữ Kỹ Thuật} & \textbf{Định Nghĩa Bản Chất \& Vai Trò Trong Đường Ống Dữ Liệu} \\
+\midrule
+\textbf{SEC EDGAR} & Hệ thống cơ sở dữ liệu điện tử chính thức của Ủy ban Chứng khoán Hoa Kỳ (Electronic Data Gathering, Analysis, and Retrieval) lưu trữ và phân phối hồ sơ tài chính công. \\
+\textbf{Form 10-K} & Báo cáo thường niên toàn diện bắt buộc theo Luật Giao dịch Chứng khoán Hoa Kỳ năm 1934, phản ánh đầy đủ tình hình kinh doanh, tài chính và pháp lý của công ty đại chúng. \\
+\textbf{Item 1A (Risk Factors)} & Phân mục bắt buộc trong Form 10-K, nơi doanh nghiệp công bố toàn bộ các rủi ro trọng yếu có thể đe dọa hoạt động kinh doanh, lợi nhuận hoặc giá trị cổ phiếu. \\
+\textbf{CIK (Central Index Key)} & Mã số nhận diện pháp lý duy nhất gồm 10 chữ số do SEC cấp phát cho từng tổ chức hoặc cá nhân nộp hồ sơ, không thay đổi theo thời gian. \\
+\textbf{Accession Number} & Mã số kiểm soát duy nhất gồm 20 ký tự (dạng \texttt{0000320193-25-000106}) gán cho mỗi lượt nộp hồ sơ cụ thể lên máy chủ SEC, gồm CIK, năm nộp và số thứ tự. \\
+\textbf{iXBRL (Inline XBRL)} & Chuẩn báo cáo tài chính điện tử quốc tế tích hợp mã siêu dữ liệu XML máy đọc được trực tiếp vào bên trong các thẻ siêu văn bản HTML người đọc được. \\
+\textbf{Medallion Architecture} & Mô hình thiết kế hồ lưu trữ dữ liệu (Lakehouse) tổ chức dữ liệu theo các tầng tinh chế lũy tiến gồm Bronze (thô), Silver (làm sạch), Gold (tính toán) và Curated (phục vụ). \\
+\textbf{Snappy Parquet} & Định dạng tệp lưu trữ theo hướng cột chuẩn mở (Apache Parquet) kết hợp thuật toán nén Snappy, tối ưu hóa phép chiếu cột (Column Projection) và nén từ điển. \\
+\textbf{Idempotency (Tính bất biến)} & Đặc tính của một tác vụ dữ liệu khi thực thi nhiều lần với cùng tập dữ liệu đầu vào luôn sinh ra cùng một trạng thái đích duy nhất, loại bỏ hoàn toàn nguy cơ nhân đôi dữ liệu. \\
+\textbf{Delta Sensor (Cảm biến)} & Cơ chế thăm dò siêu dữ liệu nhẹ kiểm tra mã \texttt{accessionNumber} để phát hiện trạng thái thay đổi của tệp nguồn trước khi kích hoạt các tác vụ tải dữ liệu nặng. \\
+\textbf{Short-circuiting (Ngắt mạch)} & Khả năng của bộ điều phối DAG tự động bỏ qua (skip) các tác vụ tính toán hạ nguồn khi cảm biến xác nhận không có bất kỳ dữ liệu mới nào phát sinh. \\
+\textbf{Quality Gate (Chốt chất lượng)} & Các điểm kiểm soát logic tự động đặt giữa các tác vụ, tiến hành kiểm tra lược đồ, dung lượng và ràng buộc nghiệp vụ trước khi cho phép dữ liệu chuyển tầng. \\
+\textbf{Tokenizer-aware Chunking} & Thuật toán phân đoạn văn bản tôn trọng cấu trúc từ vựng của bộ tách từ (Subword/WordPiece) và ranh giới câu, đảm bảo 100\% các đoạn đều không vượt trần token. \\
+\textbf{Context Window Truncation} & Lỗi suy giảm chất lượng dữ liệu âm thầm khi mô hình học sâu tự động cắt bỏ phần token vượt quá dung lượng đầu vào tối đa mà không phát ra bất kỳ cảnh báo lỗi nào. \\
+\textbf{BM25 Okapi} & Thuật toán xếp hạng từ vựng kinh điển dựa trên mô hình xác suất, tính toán mức độ liên quan giữa câu truy vấn và văn bản dựa trên tần suất từ (TF) và nghịch đảo tần suất văn bản (IDF). \\
+\textbf{Dense Vector Retrieval} & Phương pháp truy hồi ngữ nghĩa dày đặc, ánh xạ văn bản thành các véc-tơ nhiều chiều trong không gian Euclid và tính toán độ tương đồng thông qua khoảng cách Cosine. \\
+\textbf{Reciprocal Rank Fusion (RRF)} & Thuật toán dung hợp thứ hạng phi tham số kết hợp kết quả từ nhiều động cơ tìm kiếm khác nhau dựa trên tổng nghịch giá thứ tự xếp hạng, triệt tiêu độ lệch điểm số thô. \\
+\bottomrule
+\end{tabularx}
+\end{table}

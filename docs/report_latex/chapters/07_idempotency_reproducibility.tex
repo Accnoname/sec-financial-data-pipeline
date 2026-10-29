@@ -1,0 +1,68 @@
+\section{Tính Bất Biến (Idempotency) và Khả Năng Tái Lập}
+
+\subsection{Nguyên lý bất biến và cơ chế ghi đè có kiểm soát}
+Trong kỹ thuật dữ liệu chuyên nghiệp, tính bất biến (\textit{idempotency}) là nguyên tắc bắt buộc: việc thực thi một đường ống nhiều lần với cùng một tập dữ liệu đầu vào phải luôn tạo ra cùng một trạng thái đích duy nhất, tuyệt đối không làm phát sinh dữ liệu dư thừa, sai lệch hoặc trùng lặp bản ghi.
+
+Đường ống đạt được tính bất biến thông qua cơ chế ghi đè có kiểm soát (\textit{Idempotent Overwrite Pattern}) trên toàn bộ các tầng dữ liệu:
+\begin{itemize}
+    \item \textbf{Đường dẫn vật lý tất định (Deterministic File Paths)}: Định tuyến mỗi thực thể dữ liệu tới một đường dẫn tệp tin cố định dựa trên các thuộc tính tự nhiên của dữ liệu (ví dụ: \path{data/02_staging/sec_filings/NVDA/NVDA_2026_risk_factors.md} hoặc \path{data/03_primary/chunks/all_chunks.parquet}), kiên quyết không dùng chuỗi thời gian ngẫu nhiên.
+    \item \textbf{Cơ chế ghi tệp nguyên tử có thay thế (Atomic Overwrite)}: Xuất thẳng DataFrame ra đĩa thông qua các hàm ghi đè hoàn toàn (\texttt{to\_parquet} với chế độ mặc định, \texttt{write\_text} ghi đè toàn bộ tệp). Hệ thống không áp dụng cơ chế nối tiếp dữ liệu (\texttt{append mode}). Dù đường ống chạy lại 1 lần hay 100 lần, bảng \texttt{all\_chunks.parquet} vẫn duy trì chính xác 925 hàng.
+    \item \textbf{Đồng bộ Tầng Phục vụ ChromaDB}: Khi nạp dữ liệu vào cơ sở dữ liệu véc-tơ, hàm \texttt{build\_vector\_index} thực hiện truy xuất bộ sưu tập \texttt{sec\_risk\_factors} và cập nhật theo danh sách định danh hoặc tái tạo bộ sưu tập mới nếu cấu trúc dữ liệu bị thay đổi, ngăn chặn việc phát sinh các bản ghi véc-tơ mồ côi (\textit{orphaned vectors}).
+\end{itemize}
+
+\subsection{Định danh phân đoạn tất định và kiểm toán nguồn gốc}
+Khác với các ứng dụng thông thường sử dụng chuỗi định danh ngẫu nhiên (như UUID v4) để đánh dấu các đoạn văn bản dẫn đến sự xáo trộn mã khóa qua mỗi lần chạy lại, đường ống thiết lập quy tắc tạo mã định danh duy nhất tất định (\textit{Deterministic Identifier}) cho từng phân đoạn văn bản tại Tầng Vàng:
+\begin{equation}
+    \text{ID}_{\text{chunk}} = \text{TICKER} \mathbin{\_} \text{YEAR} \mathbin{\_} \text{RF} \mathbin{\_} \text{INDEX}_{04d}
+\end{equation}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        box/.style={rectangle, draw=blue!70!black, fill=blue!10, thick, rounded corners=3pt, minimum width=2.0cm, minimum height=0.7cm, align=center, font=\small\bfseries\ttfamily},
+        desc/.style={rectangle, draw=gray!40, fill=gray!5, rounded corners=2pt, text width=3.0cm, minimum height=1.0cm, align=center, font=\tiny},
+        conn/.style={font=\large\bfseries\color{blue!70!black}},
+        arrow/.style={-{Stealth[scale=0.8]}, thick, draw=blue!70!black}
+    ]
+        % 4 Khối định danh chính
+        \node[box] (b1) {NVDA};
+        \node[conn, right=0.6cm of b1] (c1) {\_};
+        \node[box, right=0.6cm of c1] (b2) {2026};
+        \node[conn, right=0.6cm of b2] (c2) {\_};
+        \node[box, right=0.6cm of c2] (b3) {RF};
+        \node[conn, right=0.6cm of b3] (c3) {\_};
+        \node[box, right=0.6cm of c3] (b4) {0001};
+
+        % Hộp mô tả chức năng bên dưới, khoảng cách rộng rãi không chạm chữ
+        \node[desc, below=0.5cm of b1] (d1) {\textbf{TICKER}\\[1pt]Mã cổ phiếu niêm yết\\(Nvidia Corporation)};
+        \node[desc, below=0.5cm of b2] (d2) {\textbf{YEAR}\\[1pt]Niên độ tài chính nộp\\(Fiscal Year 2026)};
+        \node[desc, below=0.5cm of b3] (d3) {\textbf{SECTION}\\[1pt]Phân hệ nghiệp vụ\\(Item 1A Risk Factors)};
+        \node[desc, below=0.5cm of b4] (d4) {\textbf{INDEX}\\[1pt]Thứ tự phân đoạn đệm\\(Chỉ số 0001..9999)};
+
+        \draw[arrow] (b1) -- (d1);
+        \draw[arrow] (b2) -- (d2);
+        \draw[arrow] (b3) -- (d3);
+        \draw[arrow] (b4) -- (d4);
+    \end{tikzpicture}
+    \caption{Sơ đồ phân rã cấu trúc định danh phân đoạn tất định (Deterministic Chunk ID Schema).}
+    \label{fig:chunk_id_schema}
+\end{figure}
+
+Ví dụ cụ thể: đoạn phân đoạn đầu tiên của tập đoàn Nvidia trong niên độ tài chính 2026 luôn có mã số cố định là \texttt{NVDA\_2026\_RF\_0001}. Quy tắc định danh này đem lại ba lợi ích kỹ thuật thiết yếu:
+\begin{itemize}
+    \item \textbf{Khả năng so sánh sai khác (Deterministic Diffing)}: Cho phép so sánh trực tiếp giữa các lần chạy lại để phát hiện chính xác phân đoạn nào có sự biến động nội dung khi tài liệu gốc thay đổi.
+    \item \textbf{Truy vết nguồn gốc kiểm toán 100\% (Full Data Provenance)}: Cho phép truy nguyên nguồn gốc từ bất kỳ kết quả truy hồi nào quay ngược trở lại đúng tệp tin Markdown tại Tầng Bạc và tệp HTML gốc tại Tầng Đồng.
+    \item \textbf{Tối ưu hóa bộ nhớ đệm (Safe Embedding Cache)}: Giúp các hệ thống bộ nhớ đệm ở tầng ứng dụng hạ nguồn tái sử dụng các véc-tơ nhúng đã tính toán trước đó một cách an toàn.
+\end{itemize}
+
+\subsection{Tính cô lập bước và quy trình tái lập hệ thống}
+Mỗi bước xử lý trong đường ống được thiết kế theo nguyên lý ghép nối lỏng (\textit{loose coupling}) và cô lập trạng thái (\textit{step isolation}). Dữ liệu đầu vào của Bước $N$ phụ thuộc hoàn toàn vào tệp tin vật lý được tạo ra bởi Bước $N-1$. Do đó, nếu tệp tin của Tầng Bạc đã tồn tại, kỹ sư có thể kích hoạt riêng rẽ Bước 4 hoặc Bước 5 (\texttt{python run.py 4 NVDA} hoặc \texttt{python run.py 5}) để thử nghiệm các giải thuật bóc tách mới mà không cần chạy lại các bước mạng phía trước. Nếu phát hiện tệp tin tiền đề chưa sẵn sàng, hàm nghiệp vụ sẽ đưa ra cảnh báo \texttt{FileNotFoundError} rõ ràng.
+
+Quy trình tái lập toàn bộ trạng thái dữ liệu từ mã nguồn được tiêu chuẩn hóa theo 4 thao tác tuần tự:
+\begin{enumerate}
+    \item \textbf{Nhân bản mã nguồn}: Tải mã nguồn từ kho lưu trữ GitHub:\\ \url{https://github.com/Accnoname/sec-financial-data-pipeline.git}.
+    \item \textbf{Khởi tạo môi trường ảo}: Thiết lập môi trường Python 3.10+ (\texttt{python -m venv .venv}).
+    \item \textbf{Cài đặt gói phụ thuộc}: Cài đặt chính xác các thư viện qua \texttt{pip install -r requirements.txt}.
+    \item \textbf{Thực thi điều phối cưỡng bức và kiểm thử}: Chạy toàn bộ chu trình với \texttt{python run.py dag --force} kết hợp bộ kiểm tra \texttt{pytest tests/ -v}.
+\end{enumerate}
+Toàn bộ 4 tầng hồ chứa dữ liệu sẽ được tái lập trọn vẹn trong khoảng 40 giây và vượt qua 100\% các kiểm thử chất lượng dữ liệu.

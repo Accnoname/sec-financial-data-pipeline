@@ -13,7 +13,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 MAJOR_TICKERS = ["AAPL", "AMZN", "GOOGL", "META", "MSFT", "NVDA", "TSLA"]
 
 # Skip integration tests if local data files have not been populated (e.g. in fresh CI environment)
-DATA_FILE = DATA_DIR / "01_raw" / "companies" / "all_companies.json"
+DATA_FILE = DATA_DIR / "bronze" / "companies" / "all_companies.json"
 pytestmark = pytest.mark.skipif(
     not DATA_FILE.exists(),
     reason="Data lake files not generated yet. Run 'python run.py all' to populate data."
@@ -22,14 +22,14 @@ pytestmark = pytest.mark.skipif(
 
 def test_raw_companies_json_exists():
     """Kiểm tra file dữ liệu thô Bronze (all_companies.json) tồn tại và hợp lệ"""
-    raw_file = DATA_DIR / "01_raw" / "companies" / "all_companies.json"
+    raw_file = DATA_DIR / "bronze" / "companies" / "all_companies.json"
     assert raw_file.exists(), f"Không tìm thấy file: {raw_file}"
     assert raw_file.stat().st_size > 100_000, "File JSON quá nhỏ hoặc bị rỗng"
 
 
 def test_raw_sec_filings_exist():
-    """Kiểm tra file HTML Form 10-K gốc của cả 7 tập đoàn lớn"""
-    filings_dir = DATA_DIR / "01_raw" / "sec_filings"
+    """Kiểm tra file HTML Form 10-K gốc của cả 7 tập đoàn lớn tại Bronze"""
+    filings_dir = DATA_DIR / "bronze" / "sec_filings"
     assert filings_dir.exists(), f"Không tìm thấy thư mục: {filings_dir}"
 
     for ticker in MAJOR_TICKERS:
@@ -42,7 +42,7 @@ def test_raw_sec_filings_exist():
 
 def test_staging_parquet_schema():
     """Kiểm tra file Parquet Silver đã được chuẩn hóa đúng chuẩn CIK 10 chữ số"""
-    parquet_file = DATA_DIR / "02_staging" / "companies_clean.parquet"
+    parquet_file = DATA_DIR / "silver" / "companies_clean.parquet"
     assert parquet_file.exists(), f"Không tìm thấy file: {parquet_file}"
 
     df = pd.read_parquet(parquet_file)
@@ -58,8 +58,8 @@ def test_staging_parquet_schema():
 
 
 def test_markdown_risk_factors_all_tickers():
-    """Kiểm tra file Markdown trích xuất phần Item 1A Risk Factors cho cả 7 tập đoàn"""
-    staging_dir = DATA_DIR / "02_staging" / "sec_filings"
+    """Kiểm tra file Markdown trích xuất phần Item 1A Risk Factors cho cả 7 tập đoàn tại Silver"""
+    staging_dir = DATA_DIR / "silver" / "sec_filings"
     assert staging_dir.exists(), f"Không tìm thấy thư mục: {staging_dir}"
 
     for ticker in MAJOR_TICKERS:
@@ -75,7 +75,7 @@ def test_markdown_risk_factors_all_tickers():
 
 def test_gold_chunks_schema_and_content():
     """Kiểm tra tính toàn vẹn của Tầng Gold (all_chunks.parquet và các file chunks con)"""
-    chunks_dir = DATA_DIR / "03_primary" / "chunks"
+    chunks_dir = DATA_DIR / "gold" / "chunks"
     unified_parquet = chunks_dir / "all_chunks.parquet"
     assert unified_parquet.exists(), f"Không tìm thấy file tổng hợp: {unified_parquet}"
 
@@ -105,7 +105,7 @@ def test_gold_chunks_schema_and_content():
 
 def test_curated_vector_db():
     """Kiểm tra ChromaDB tại Tầng Curated đã nạp đủ vector chunks"""
-    vector_db_dir = DATA_DIR / "04_curated" / "vector_db"
+    vector_db_dir = DATA_DIR / "curated" / "vector_db"
     assert vector_db_dir.exists(), f"Chưa tìm thấy vector DB tại {vector_db_dir}"
 
     import chromadb
@@ -120,7 +120,7 @@ def test_gold_chunks_fit_embedding_context_window():
     """Data Contract: Khong chunk nao vuot qua max_seq_length (256 tokens) cua model embedding"""
     from sentence_transformers import SentenceTransformer
 
-    unified_parquet = DATA_DIR / "03_primary" / "chunks" / "all_chunks.parquet"
+    unified_parquet = DATA_DIR / "gold" / "chunks" / "all_chunks.parquet"
     df = pd.read_parquet(unified_parquet)
     model = SentenceTransformer("all-MiniLM-L6-v2")
     max_limit = model.max_seq_length
@@ -138,7 +138,7 @@ def test_gold_chunks_fit_embedding_context_window():
 
 def test_rag_prompt_construction():
     """Kiểm tra logic tạo Prompt cho LLM từ chunks"""
-    from src.rag.retriever import _build_prompt
+    from src.curated.retriever import _build_prompt
     fake_chunks = [
         {
             "text": "NVIDIA faces severe supply chain constraints on AI chips.",

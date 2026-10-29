@@ -1,0 +1,139 @@
+\documentclass[10pt,a4paper]{article}
+
+% ==============================================================================
+% 1. CẤU HÌNH NGÔN NGỮ & BỘ GÕ TIẾNG VIỆT THEO CHUẨN T5
+% ==============================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+
+% ==============================================================================
+% 2. ĐỊNH DẠNG KHỔ GIẤY, LỀ VĂN BẢN & KHOẢNG CÁCH DÒNG (CHUẨN KỸ THUẬT)
+% ==============================================================================
+\usepackage[a4paper, top=1.8cm, bottom=1.8cm, left=1.8cm, right=1.8cm]{geometry}
+\linespread{1.18}
+\setlength{\parskip}{4.5pt plus 1.5pt minus 1pt}
+\setlength{\parindent}{0pt}
+
+\usepackage{enumitem}
+\setlist[itemize,1]{label=--, nosep, leftmargin=1.6em, topsep=3pt, itemsep=2.5pt, partopsep=0pt}
+\setlist[itemize,2]{label=--, nosep, leftmargin=1.4em, topsep=2pt, itemsep=2pt, partopsep=0pt}
+\setlist[enumerate]{nosep, leftmargin=1.6em, topsep=3pt, itemsep=2.5pt, partopsep=0pt}
+
+% ==============================================================================
+% 3. CÁC GÓI TOÁN HỌC, BẢNG BIỂU HỌC THUẬT & HÌNH ẢNH
+% ==============================================================================
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, backgrounds, fit}
+
+% Bảng màu kiến trúc hồ chứa Medallion Lakehouse
+\definecolor{secbg}{RGB}{248, 244, 255}
+\definecolor{secborder}{RGB}{110, 50, 170}
+\definecolor{bronzebg}{RGB}{254, 248, 240}
+\definecolor{bronzeborder}{RGB}{175, 95, 25}
+\definecolor{silverbg}{RGB}{240, 248, 255}
+\definecolor{silverborder}{RGB}{30, 110, 175}
+\definecolor{goldbg}{RGB}{255, 251, 235}
+\definecolor{goldborder}{RGB}{195, 135, 10}
+\definecolor{curatedbg}{RGB}{236, 244, 255}
+\definecolor{curatedborder}{RGB}{15, 75, 155}
+\definecolor{govbg}{RGB}{242, 250, 245}
+\definecolor{govborder}{RGB}{25, 130, 80}
+\definecolor{olapbg}{RGB}{240, 255, 245}
+\definecolor{olapborder}{RGB}{20, 130, 60}
+\definecolor{ragbg}{RGB}{250, 242, 255}
+\definecolor{ragborder}{RGB}{125, 45, 165}
+
+% ==============================================================================
+% 4. ĐỊNH DẠNG TIÊU ĐỀ, LIÊN KẾT & HEADER/FOOTER
+% ==============================================================================
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries\color{blue!70!black}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries\color{black}}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\small\bfseries\color{black!80}}{\thesubsubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{7pt plus 2pt minus 1pt}{3pt plus 1pt minus 0.5pt}
+\titlespacing*{\subsection}{0pt}{5pt plus 1.5pt minus 1pt}{2.5pt plus 1pt minus 0.5pt}
+\titlespacing*{\subsubsection}{0pt}{3.5pt plus 1pt minus 0.5pt}{1.5pt plus 0.5pt minus 0.5pt}
+
+% Tối ưu hóa phân bổ float trên trang
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\bottomfraction}{0.95}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.85}
+\setlength{\floatsep}{3pt plus 1pt minus 1pt}
+\setlength{\textfloatsep}{5pt plus 1pt minus 1pt}
+\setlength{\intextsep}{3pt plus 1pt minus 1pt}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\setlength{\headheight}{13pt}
+\fancyhf{}
+\fancyhead[L]{\small\itshape Báo Cáo Kỹ Thuật: SEC EDGAR Financial Data Pipeline}
+\fancyhead[R]{\small Trang \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\usepackage[unicode, colorlinks=true, linkcolor=blue!70!black, citecolor=blue!70!black, urlcolor=blue!70!black]{hyperref}
+
+% Khai báo đường dẫn chứa hình ảnh
+\graphicspath{{figures/}}
+
+% ==============================================================================
+% 5. BẮT ĐẦU TÀI LIỆU
+% ==============================================================================
+\begin{document}
+
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\thispagestyle{plain}
+
+% ----------------- TIÊU ĐỀ BÁO CÁO HỌC THUẬT (PAGE 1) -----------------
+\begin{center}
+    {\scshape\footnotesize BÁO CÁO NGHIÊN CỨU \& CHUYÊN KHẢO KỸ THUẬT DỮ LIỆU\par}
+    \vspace{0.25cm}
+    {\Large\bfseries\color{blue!70!black} Kiến Trúc Đường Ống Dữ Liệu Tài Chính SEC EDGAR: Vận Hành Hồ Chứa Medallion, Quản Trị Chất Lượng và Phục Vụ Rủi Ro Form 10-K\par}
+    \vspace{0.15cm}
+    {\small\itshape SEC EDGAR Financial Data Engineering Pipeline: Medallion Lakehouse Architecture, Data Quality Governance, and Risk Factor Analytics\par}
+    \vspace{0.25cm}
+    {\small\textbf{Lưu Gia Phong} (Accnoname) $|$ Lead Data Pipeline Engineer $|$ Trường Đại học Phenikaa\par}
+    {\footnotesize\color{gray} Hà Nội, Tháng 10 Năm 2026 $|$ Lưu trữ mã nguồn: \url{https://github.com/Accnoname/sec-financial-data-pipeline}\par}
+    \vspace{0.25cm}
+\end{center}
+\hrule
+\vspace{0.3cm}
+
+% ----------------- NỘI DUNG CÁC CHƯƠNG MỤC (TRỤC PIPELINE DATA ENGINEERING) -----------------
+\input{chapters/00_abstract.tex}
+\input{chapters/01_problem_scope.tex}
+\input{chapters/02_dataflow_contracts.tex}
+\input{chapters/03_ingestion.tex}
+\input{chapters/04_transformation.tex}
+\input{chapters/05_storage_design.tex}
+\input{chapters/06_orchestration_config.tex}
+\input{chapters/07_idempotency_reproducibility.tex}
+\input{chapters/08_data_quality_testing.tex}
+\input{chapters/09_serving_layer.tex}
+\input{chapters/10_case_study_truncation.tex}
+\input{chapters/11_operations_scalability.tex}
+\input{chapters/12_limitations_future_work.tex}
+
+% ----------------- TÀI LIỆU THAM KHẢO -----------------
+\begingroup
+\footnotesize
+\setlength{\parskip}{0pt}
+\setlength{\itemsep}{0pt}
+\bibliographystyle{IEEEtran}
+\bibliography{ref}
+\endgroup
+
+% ----------------- PHỤ LỤC THUẬT NGỮ CHUYÊN NGÀNH -----------------
+\clearpage
+\input{chapters/13_appendix_glossary.tex}
+
+\end{document}

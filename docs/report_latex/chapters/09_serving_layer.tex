@@ -1,0 +1,65 @@
+\section{Tầng Phục Vụ (Serving Layer)}
+
+\subsection{Cơ chế nạp và lập chỉ mục tại Tầng Phục Vụ}
+Sau khi dữ liệu phân đoạn được chuẩn hóa toàn diện tại Tầng Vàng (\texttt{all\_chunks.parquet}), đường ống tiến hành bàn giao dữ liệu sang Tầng Phục Vụ (Curated Layer) thông qua mô-đun \path{src/rag/embedder.py}. Hệ thống triển khai giải pháp cơ sở dữ liệu véc-tơ cục bộ ChromaDB (\texttt{PersistentClient}), lưu trữ trực tiếp dưới dạng các tệp tin nhị phân và SQLite tại thư mục \path{data/04_curated/vector_db/}.
+
+Quá trình chuyển đổi véc-tơ hóa sử dụng mô hình mã hóa ngôn ngữ nhỏ gọn \texttt{all-MiniLM-L6-v2}~\cite{reimers2019sentence}, ánh xạ từng đoạn văn bản thành một véc-tơ nhúng dày đặc 384 chiều trong không gian Euclid. Toàn bộ 925 đoạn văn bản cùng các trường siêu dữ liệu kiểm toán (\texttt{chunk\_id}, \texttt{ticker}, \texttt{year}, \texttt{section}, \texttt{chunk\_index}) được nạp vào bộ sưu tập mang tên \mbox{\texttt{sec\_risk\_factors}} với độ đo khoảng cách Cosine chuẩn hóa.
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        node distance=0.35cm and 0.6cm,
+        box/.style={rectangle, draw=blue!70!black, fill=blue!5, thick, rounded corners=2pt, minimum width=2.5cm, minimum height=0.65cm, align=center, font=\tiny},
+        db/.style={rectangle, draw=blue!70!black, fill=blue!12, thick, rounded corners=2pt, minimum width=2.7cm, minimum height=0.7cm, align=center, font=\tiny\bfseries},
+        process/.style={rectangle, draw=gray!60, fill=gray!5, rounded corners=2pt, minimum width=2.5cm, minimum height=0.65cm, align=center, font=\tiny},
+        querybox/.style={rectangle, draw=orange!80!black, fill=orange!8, thick, rounded corners=2pt, minimum width=3.6cm, minimum height=0.68cm, align=center, font=\tiny\bfseries},
+        arrow/.style={-{Stealth[scale=0.8]}, thick, draw=blue!70!black}
+    ]
+        % --- TẦNG VÀNG & HAI NHÁNH PHỤC VỤ (OFFLINE PIPELINE) ---
+        \node[db] (gold) {\textbf{Tầng Vàng (Gold)}\\\texttt{all\_chunks.parquet} (Snappy)};
+        
+        \node[process, left=0.9cm of gold] (duckdb) {\textbf{DuckDB / Polars}\\Chiếu cột, bỏ qua \texttt{text}};
+        \node[box, below=0.35cm of duckdb] (analytics) {\textbf{Báo Cáo Định Lượng}\\Tổng hợp thống kê $<5$ms};
+        
+        \node[process, right=0.9cm of gold] (embed) {\textbf{all-MiniLM-L6-v2}\\Mã hóa vector 384 chiều};
+        \node[db, below=0.35cm of embed] (chroma) {\textbf{ChromaDB (Curated)}\\\texttt{sec\_risk\_factors}};
+        
+        \draw[arrow] (gold) -- (duckdb);
+        \draw[arrow] (duckdb) -- (analytics);
+        \draw[arrow] (gold) -- (embed);
+        \draw[arrow] (embed) -- (chroma);
+        
+        % --- LUỒNG TRUY VẤN NGƯỜI DÙNG (ONLINE RETRIEVAL) ---
+        \node[querybox, below=1.2cm of gold] (query) {\textbf{Câu Hỏi Người Dùng (User Financial Query)}\\Ví dụ: ``Rủi ro chuỗi cung ứng của Nvidia năm 2026?''};
+        
+        \node[process, below left=0.45cm and 0.2cm of query] (bm25) {\textbf{Nhánh BM25 (Sparse)}\\Khớp từ khóa chính xác trên Parquet};
+        \node[process, below right=0.45cm and 0.2cm of query] (dense) {\textbf{Nhánh Dense (ChromaDB)}\\So khớp ngữ nghĩa Cosine 384 chiều};
+        
+        \node[box, below=1.55cm of query, minimum width=5.0cm] (rrf) {\textbf{Dung Hợp Thứ Hạng RRF ($k=60$)}\\Tổng hợp điểm từ vựng chính xác \& ngữ nghĩa dày đặc};
+        \node[box, below=0.32cm of rrf, minimum width=6.2cm] (llm) {\textbf{Ngữ Cảnh Kiểm Toán [Source: ID] $\rightarrow$ Gemini LLM}\\Sinh câu trả lời tài chính khách quan có trích dẫn nguồn 10-K};
+        
+        \draw[arrow] (query.south) -| (bm25.north);
+        \draw[arrow] (query.south) -| (dense.north);
+        
+        \draw[arrow] (bm25.south) |- (rrf.west);
+        \draw[arrow] (dense.south) |- (rrf.east);
+        
+        \draw[arrow] (rrf) -- (llm);
+    \end{tikzpicture}
+    \caption{Sơ đồ luồng truy xuất dữ liệu hai kênh: Kênh phân tích định lượng trực tiếp từ Tầng Vàng và Kênh tìm kiếm kết hợp Hybrid RAG phục vụ người dùng.}
+    \label{fig:retrieval_flow}
+\end{figure}
+
+\subsection{Khai thác dữ liệu qua động cơ tìm kiếm kết hợp Hybrid Search}
+Dữ liệu ra khỏi đường ống được khai thác trực tiếp bởi động cơ truy hồi thông tin kết hợp (\path{src/rag/hybrid_retriever.py}), kết hợp hài hòa giữa khả năng hiểu ngữ nghĩa sâu và độ chính xác từ khóa rời rạc:
+\begin{itemize}
+    \item \textbf{Nhánh truy hồi ngữ nghĩa dày đặc (Dense Retrieval)}: Mã hóa câu hỏi của người dùng thành véc-tơ 384 chiều và so khớp với 925 véc-tơ trong ChromaDB để tìm ra top-$k$ phân đoạn có độ tương đồng Cosine cao nhất, hỗ trợ lọc theo mã cổ phiếu và năm tài chính.
+    \item \textbf{Nhánh tìm kiếm từ vựng rời rạc (Sparse BM25 Path)}: Sử dụng bộ tách từ loại bỏ từ dừng và tính toán điểm số khớp từ vựng chính xác dựa trên tần suất từ (TF) và nghịch đảo tần suất văn bản (IDF) theo thuật toán BM25 Okapi~\cite{robertson2009probabilistic} đọc trực tiếp từ tệp Parquet Tầng Vàng.
+    \item \textbf{Dung hợp thứ hạng nghịch đảo (Reciprocal Rank Fusion -- RRF)}: Kết quả từ hai nhánh được hợp nhất phi tham số với hằng số làm mượt $k=60$~\cite{cormack2009reciprocal}:
+    \begin{equation}
+        \text{Score}_{\text{RRF}}(d) = \frac{1}{60 + \text{Rank}_{\text{Dense}}(d)} + \frac{1}{60 + \text{Rank}_{\text{BM25}}(d)}
+    \end{equation}
+\end{itemize}
+
+\subsection{Cung cấp ngữ cảnh kiểm toán cho mô hình ngôn ngữ lớn}
+Đầu ra cuối cùng của Tầng Phục Vụ được định tuyến tới mô-đun \texttt{src/rag/retriever.py}. Các phân đoạn đạt điểm RRF cao nhất được tổ chức thành một khối ngữ cảnh có cấu trúc kèm nhãn trích dẫn tường minh (ví dụ: \texttt{[Source 1: NVDA 2026, Item 1A, chunk 1]}). Mô hình ngôn ngữ lớn (Gemini AI) tiếp nhận ngữ cảnh này cùng câu hỏi của chuyên viên tài chính để tổng hợp câu trả lời khách quan, cam kết không bịa đặt thông tin và cung cấp đường dẫn truy nguyên ngược về đúng báo cáo Form 10-K gốc.

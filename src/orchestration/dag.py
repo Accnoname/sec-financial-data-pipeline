@@ -15,7 +15,7 @@ project_root = Path(__file__).resolve().parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from src.common.config import RAW_DIR, STAGING_DIR, PRIMARY_DIR, CURATED_DIR, PROJECT_ROOT
+from src.common.config import BRONZE_DIR, SILVER_DIR, GOLD_DIR, CURATED_DIR, PROJECT_ROOT
 from src.common.logger import get_logger
 from src.orchestration.state import TaskStatus, TaskResult
 from src.orchestration.task import Task
@@ -84,9 +84,9 @@ class PipelineDAG:
                 if ingest_res and not ingest_res.metadata.get("has_changes", True):
                     can_skip = False
                     if task_id == "step_4_extract_risk_factors":
-                        can_skip = (STAGING_DIR / "sec_filings").exists()
+                        can_skip = (SILVER_DIR / "sec_filings").exists()
                     elif task_id == "step_5_chunk_risk_factors":
-                        can_skip = (PRIMARY_DIR / "chunks" / "all_chunks.parquet").exists()
+                        can_skip = (GOLD_DIR / "chunks" / "all_chunks.parquet").exists()
                     elif task_id == "step_6_build_vector_index":
                         can_skip = (CURATED_DIR / "vector_db").exists()
 
@@ -139,12 +139,12 @@ class PipelineDAG:
 
 def build_sec_pipeline_dag(force: bool = False) -> PipelineDAG:
     """Factory function constructing the full 6-step SEC Financial Pipeline DAG."""
-    from src.ingestion.extract_companies import fetch_and_save_companies
-    from src.transformation.clean_companies import clean_companies
-    from src.ingestion.ingest_10k_filings import ingest_filings
-    from src.transformation.clean_10k_to_text import extract_all_risk_factors
-    from src.rag.chunking import chunk_all_risk_factors
-    from src.rag.embedder import build_vector_index
+    from src.bronze.extract_companies import fetch_and_save_companies
+    from src.silver.clean_companies import clean_companies
+    from src.bronze.ingest_10k_filings import ingest_filings
+    from src.silver.clean_10k_to_text import extract_all_risk_factors
+    from src.gold.chunking import chunk_all_risk_factors
+    from src.curated.embedder import build_vector_index
 
     dag = PipelineDAG(dag_id="sec_financial_data_and_rag_pipeline", force=force)
 
@@ -155,7 +155,7 @@ def build_sec_pipeline_dag(force: bool = False) -> PipelineDAG:
         fn=lambda: fetch_and_save_companies(force=force),
         max_retries=3,
         post_gate=lambda: QualityGate.assert_file_exists(
-            RAW_DIR / "companies" / "all_companies.json", min_bytes=100_000
+            BRONZE_DIR / "companies" / "all_companies.json", min_bytes=100_000
         ),
     )
     dag.add_task(t1)
@@ -167,10 +167,10 @@ def build_sec_pipeline_dag(force: bool = False) -> PipelineDAG:
         fn=clean_companies,
         max_retries=2,
         pre_gate=lambda: QualityGate.assert_file_exists(
-            RAW_DIR / "companies" / "all_companies.json"
+            BRONZE_DIR / "companies" / "all_companies.json"
         ),
         post_gate=lambda: QualityGate.assert_parquet_schema(
-            STAGING_DIR / "companies_clean.parquet",
+            SILVER_DIR / "companies_clean.parquet",
             expected_columns={"cik", "ticker", "name"},
             min_rows=10_000,
         ),
@@ -203,7 +203,7 @@ def build_sec_pipeline_dag(force: bool = False) -> PipelineDAG:
         fn=chunk_all_risk_factors,
         max_retries=2,
         post_gate=lambda: QualityGate.assert_parquet_schema(
-            PRIMARY_DIR / "chunks" / "all_chunks.parquet",
+            GOLD_DIR / "chunks" / "all_chunks.parquet",
             expected_columns={"chunk_id", "ticker", "year", "text", "word_count"},
             min_rows=800,
         ),

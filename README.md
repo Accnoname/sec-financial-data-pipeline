@@ -38,36 +38,36 @@ Moving beyond static web-scraping scripts, this system applies resilient data en
                    |                                                 |
                    v (If New Filing Detected)                        v (If Data Up-to-Date)
 +--------------------------------------+     +------------------------------------------+
-| 01_RAW (BRONZE LAYER)                |     | SHORT-CIRCUIT AUDIT                      |
+| BRONZE LAYER (data/bronze/)          |     | SHORT-CIRCUIT AUDIT                      |
 | - companies/all_companies.json       |     | - Status: SKIPPED (Cache Valid)          |
 | - sec_filings/{TICKER}/*.htm (Raw)   |     | - Execution Duration: < 4 seconds        |
 | - sec_filings/{TICKER}/metadata.json |     | - Zero redundant API/compute expenditure |
 +------------------+-------------------+     +------------------------------------------+
                    |
-                   | 2. Parsing, DOM Stripping, CIK Normalization
+                   | 2. Parsing, DOM Stripping, CIK Normalization (src/silver/)
                    v
 +---------------------------------------------------------------------------------------+
-| 02_STAGING (SILVER LAYER)                                                             |
+| SILVER LAYER (data/silver/)                                                           |
 | - companies_clean.parquet (Standardized 10-digit CIK, deduplicated, Snappy compressed)|
 | - sec_filings/{TICKER}/*_risk_factors.md (Extracted Item 1A Business Risk Narratives)  |
 +------------------+--------------------------------------------------------------------+
                    |
-                   | 3. Semantic Chunking (500 words, 100-word sliding overlap)
+                   | 3. Semantic Chunking & BM25 Lexical Indexing (src/gold/)
                    v
 +---------------------------------------------------------------------------------------+
-| 03_PRIMARY (GOLD LAYER)                                                               |
+| GOLD LAYER (data/gold/)                                                               |
 | - chunks/{TICKER}_{YEAR}_chunks.parquet (Analytical chunk dataset)                    |
-| - chunks/all_chunks.parquet (Consolidated 262 semantic units with word counts)        |
+| - chunks/all_chunks.parquet (Consolidated 925 semantic units with word & token counts)|
 +------------------+--------------------------------------------------------------------+
                    |
-                   | 4. Vector Embedding (SentenceTransformers: all-MiniLM-L6-v2)
+                   | 4. Vector Embedding & Hybrid RAG Serving (src/curated/)
                    v
 +---------------------------------------------------------------------------------------+
-| 04_CURATED (SERVING LAYER)                                                            |
+| CURATED LAYER (data/curated/)                                                         |
 | - vector_db/ (ChromaDB Persistent Vector Store, Cosine Similarity Index)              |
 +------------------+--------------------------------------------------------------------+
                    |
-                   | 5. Top-K Semantic Retrieval & LLM Grounding (Gemini AI)
+                   | 5. Top-K Hybrid Retrieval (RRF) & LLM Grounding (Gemini AI)
                    v
 +---------------------------------------------------------------------------------------+
 | AI RAG QUERY INTERFACE                                                                |
@@ -82,7 +82,7 @@ Moving beyond static web-scraping scripts, this system applies resilient data en
 ### 1. SEC Filing Sensor & Delta Detection
 Financial disclosures for a given firm are typically filed once per fiscal year. Re-downloading, parsing, and embedding massive reports continuously constitutes an anti-pattern.
 - The pipeline queries `https://data.sec.gov/submissions/CIK{padded_cik}.json` and extracts the latest `accessionNumber` and `filingDate`.
-- Compares the remote metadata against local state in `data/01_raw/sec_filings/{ticker}/metadata.json`.
+- Compares the remote metadata against local state in `data/bronze/sec_filings/{ticker}/metadata.json`.
 - If the accession number matches and local artifacts exist, ingestion is skipped.
 - The DAG captures this signal (`has_changes: false`) and automatically bypasses downstream transformation and embedding tasks, logging a clean audit record in ~3 seconds.
 
@@ -109,12 +109,12 @@ Financial disclosures for a given firm are typically filed once per fiscal year.
 
 | Layer | Storage Path | Format | Schema & Description |
 | :--- | :--- | :--- | :--- |
-| **Bronze** | `data/01_raw/companies/` | JSON | Raw company directory from SEC EDGAR (10,400+ public entities). |
-| **Bronze** | `data/01_raw/sec_filings/{TICKER}/` | HTML / JSON | Raw Form 10-K disclosures (1-8 MB each) and filing metadata state. |
-| **Silver** | `data/02_staging/companies_clean.parquet` | Parquet (Snappy) | Normalized schema: `cik` (String), `ticker` (String), `name` (String), `exchange` (String), `is_major` (Boolean). |
-| **Silver** | `data/02_staging/sec_filings/{TICKER}/` | Markdown | Extracted and normalized Item 1A Risk Factors text. |
-| **Gold** | `data/03_primary/chunks/` | Parquet / JSON | Schema: `chunk_id` (String), `ticker` (String), `year` (Int64), `section` (String), `chunk_index` (Int64), `text` (String), `token_count` (Int64), `word_count` (Int64). Total: 925 chunks (≤240 tokens). |
-| **Curated**| `data/04_curated/vector_db/` | ChromaDB / Vector | Persistent cosine vector collection (`sec_risk_factors`). |
+| **Bronze** | `data/bronze/companies/` | JSON | Raw company directory from SEC EDGAR (10,400+ public entities). |
+| **Bronze** | `data/bronze/sec_filings/{TICKER}/` | HTML / JSON | Raw Form 10-K disclosures (1-8 MB each) and filing metadata state. |
+| **Silver** | `data/silver/companies_clean.parquet` | Parquet (Snappy) | Normalized schema: `cik` (String), `ticker` (String), `name` (String), `exchange` (String), `is_major` (Boolean). |
+| **Silver** | `data/silver/sec_filings/{TICKER}/` | Markdown | Extracted and normalized Item 1A Risk Factors text. |
+| **Gold** | `data/gold/chunks/` | Parquet / JSON | Schema: `chunk_id` (String), `ticker` (String), `year` (Int64), `section` (String), `chunk_index` (Int64), `text` (String), `token_count` (Int64), `word_count` (Int64). Total: 925 chunks (≤240 tokens). |
+| **Curated**| `data/curated/vector_db/` | ChromaDB / Vector | Persistent cosine vector collection (`sec_risk_factors`). |
 
 ---
 
@@ -130,38 +130,45 @@ sec-financial-data-pipeline/
 |-- run.py                              # Master CLI and execution orchestrator
 |-- setup_windows_task.bat              # Windows Task Scheduler registration script
 |-- data/                               # Medallion Lakehouse storage (local data lake)
-|   |-- 01_raw/                         # Bronze Layer: Raw SEC JSON and 10-K HTML
-|   |-- 02_staging/                     # Silver Layer: Normalized Parquet and Markdown
-|   |-- 03_primary/                     # Gold Layer: Consolidated semantic chunks
-|   `-- 04_curated/                     # Curated Layer: ChromaDB vector collections
+|   |-- bronze/                         # Bronze Layer: Raw SEC JSON and 10-K HTML
+|   |-- silver/                         # Silver Layer: Normalized Parquet and Markdown
+|   |-- gold/                           # Gold Layer: Consolidated semantic chunks & BM25 index
+|   `-- curated/                        # Curated Layer: ChromaDB vector collections
 |-- docs/                               # Architectural blueprints and engineering guides
 |   |-- architecture.md
 |   `-- system_architecture_and_design_guide.md
 |-- logs/                               # Structured audit and scheduler run logs
 |   `-- orchestration_audit.jsonl
-|-- src/                                # Modular pipeline source code
+|-- src/                                # Modular pipeline source code (Medallion Layers)
 |   |-- common/                         # Shared utilities, configs, and loggers
-|   |   |-- config.py
+|   |   |-- config.py                   # Central directory path management
 |   |   `-- logger.py
-|   |-- ingestion/                      # Bronze data acquisition modules
+|   |-- bronze/                         # Bronze Layer: Raw data acquisition & ingestion
 |   |   |-- extract_companies.py        # SEC company master list ingestion
 |   |   `-- ingest_10k_filings.py       # 10-K retrieval with Delta Change Detection
+|   |-- silver/                         # Silver Layer: Data cleansing and normalization
+|   |   |-- clean_companies.py          # CIK 10-digit zero-padding and normalization
+|   |   `-- clean_10k_to_text.py        # Item 1A Risk Factors regex/HTML parser
+|   |-- gold/                           # Gold Layer: Semantic chunking and BM25 index
+|   |   |-- chunking.py                 # Tokenizer-aware semantic sliding window chunker
+|   |   `-- bm25.py                     # Okapi BM25 sparse keyword ranking engine
+|   |-- curated/                        # Curated / Serving Layer: Embeddings and Hybrid RAG
+|   |   |-- embedder.py                 # Vector embedding indexer (ChromaDB)
+|   |   |-- hybrid_retriever.py         # Reciprocal Rank Fusion (RRF) hybrid search
+|   |   `-- retriever.py                # Top-K retrieval and Gemini LLM synthesis
 |   |-- orchestration/                  # Enterprise pipeline orchestration engine
 |   |   |-- dag.py                      # PipelineDAG dependency coordinator
 |   |   |-- quality_gate.py             # Pre/post execution quality assertions
 |   |   |-- scheduler.py                # Standalone daemon scheduling loop
 |   |   |-- state.py                    # Task status models and execution telemetry
 |   |   `-- task.py                     # Resilient task runner with backoff retry
-|   |-- rag/                            # Retrieval-Augmented Generation subsystem
-|   |   |-- chunking.py                 # Semantic chunking and metadata tagger
-|   |   |-- embedder.py                 # Vector embedding indexer (ChromaDB)
-|   |   `-- retriever.py                # Top-K retrieval and Gemini LLM synthesis
-|   `-- transformation/                 # Silver cleaning and extraction modules
-|       |-- clean_10k_to_text.py        # Item 1A Risk Factors regex/HTML parser
-|       `-- clean_companies.py          # CIK 10-digit zero-padding and normalization
-`-- tests/                              # Automated test suite
-    |-- test_pipeline.py                # End-to-end integration tests
+|   |-- ingestion/                      # (Backward-compatibility forwarders -> src/bronze)
+|   |-- transformation/                 # (Backward-compatibility forwarders -> src/silver)
+|   `-- rag/                            # (Backward-compatibility forwarders -> src/gold & src/curated)
+`-- tests/                              # Automated test suite (24/24 tests passed)
+    |-- test_pipeline.py                # End-to-end Medallion integration tests
     `-- unit/                           # Module unit tests
+        |-- test_hybrid_rag.py          # BM25, RRF, and Hybrid Retriever tests
         |-- test_orchestration.py       # DAG, retry, and quality gate tests
         `-- test_units.py               # Parsing, chunking, and validation tests
 ```
@@ -242,7 +249,7 @@ python run.py 6           # Step 6: Generate embeddings and build ChromaDB index
 ## Empirical Retrieval Evaluation & Benchmark Suite
 
 ### 1. Methodology & Authorship Disclosure
-To objectively evaluate retrieval performance beyond qualitative inspection, the platform includes an automated evaluation harness (`eval_retrieval.py`):
+To objectively evaluate retrieval performance beyond qualitative inspection, the platform includes an automated evaluation harness (`benchmarks/eval_retrieval.py`):
 - **Benchmark Suite:** 20 ground-truth questions evaluating Item 1A disclosures across 7 companies (AAPL, AMZN, GOOGL, META, MSFT, NVDA, TSLA), with 10 questions targeting information formerly located beyond the 256-token mark (`late_in_old_chunk: true`) and 10 questions in the early window (`late_in_old_chunk: false`).
 - **Authorship Disclosure:** *Questions drafted with AI assistance, anchors verified verbatim against Silver markdown.*
 - **Evaluation Metrics:** Hit@k (exact question count and percentage), Mean Reciprocal Rank (MRR), and 500-trial Monte Carlo Random Baselines.

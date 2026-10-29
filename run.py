@@ -3,11 +3,11 @@ import sys
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-from src.ingestion.extract_companies import fetch_and_save_companies
-from src.transformation.clean_companies import clean_companies
-from src.ingestion.ingest_10k_filings import ingest_filings
-from src.transformation.clean_10k_to_text import extract_all_risk_factors, extract_risk_factors
-from src.rag.chunking import chunk_all_risk_factors, chunk_for_rag
+from src.bronze.extract_companies import fetch_and_save_companies
+from src.silver.clean_companies import clean_companies
+from src.bronze.ingest_10k_filings import ingest_filings
+from src.silver.clean_10k_to_text import extract_all_risk_factors, extract_risk_factors
+from src.gold.chunking import chunk_all_risk_factors, chunk_for_rag
 
 
 def run_step_4(arg: str | None = None):
@@ -24,13 +24,13 @@ def run_step_5(arg: str | None = None):
 
 def run_step_6():
     """Bước 6: Tạo vector embedding và nạp vào ChromaDB (Tầng Curated)."""
-    from src.rag.embedder import build_vector_index
+    from src.curated.embedder import build_vector_index
     return build_vector_index()
 
 
 def run_step_7(question: str | None = None):
     """Bước 7: Hỏi đáp RAG bằng Gemini API."""
-    from src.rag.retriever import rag_query
+    from src.curated.retriever import rag_query
     if not question:
         print("Dùng: python run.py 7 \"Cau hoi cua ban\"")
         print("Vi du: python run.py 7 \"What are Nvidia AI risks in 2026?\"")

@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Phan Ra Bien Doi Du Lieu Thuc Te Qua Cac Tang Pipeline",
+    "output": "figures/pipeline_step_decomposition.html",
+    "viewBox": [1080, 520],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "bronze-to-silver",
+        "label": "Phan ra Bronze sang Silver",
+        "focus": ["raw_record", "raw_filing", "silver_record", "silver_doc"],
+        "note": "Chuan hoa ma CIK thanh 10 chu so, chuyen sang Parquet Snappy giam 75.7% dung luong va boc tach HTML sang Markdown."
+      },
+      {
+        "id": "silver-to-gold",
+        "label": "Phan ra Silver sang Gold Chunk",
+        "focus": ["silver_doc", "chunk_record"],
+        "note": "Phan doan co nhan thuc token (<= 240 tokens), sao luu 40 token lam phan goi dau tranh bi lo thong tin ranh gioi."
+      },
+      {
+        "id": "gold-to-serving",
+        "label": "Phan ra Curated va RRF Fusion",
+        "focus": ["chunk_record", "dense_emb", "sparse_bm25", "rrf_fusion"],
+        "note": "Ma hoa thanh vector 384 chieu va chi muc tu khoa BM25, dung hoa thu hang bang cong thuc RRF k=60."
+      }
+    ]
+  },
+  "stages": [
+    { "label": "1. Bronze Lake" },
+    { "label": "2. Silver Lake" },
+    { "label": "3. Gold Chunk" },
+    { "label": "4. Curated Index" },
+    { "label": "5. Serving RRF" }
+  ],
+  "nodes": [
+    { "id": "raw_record", "type": "database", "label": "CIK: 320193", "sublabel": "1.18 MB JSON", "stage": 0, "row": 0, "tag": "Bronze" },
+    { "id": "raw_filing", "type": "database", "label": "HTML 10-K (AAPL)", "sublabel": "1.48 MB HTML", "stage": 0, "row": 2, "tag": "Bronze" },
+    { "id": "silver_record", "type": "database", "label": "CIK: 0000320193", "sublabel": "287 KB Parquet", "stage": 1, "row": 0, "tag": "Snappy" },
+    { "id": "silver_doc", "type": "database", "label": "Item 1A Markdown", "sublabel": "67 KB Markdown", "stage": 1, "row": 2, "tag": "Silver" },
+    { "id": "chunk_record", "type": "database", "label": "Chunk #0042", "sublabel": "178 tokens", "stage": 2, "row": 1, "tag": "Gold" },
+    { "id": "dense_emb", "type": "backend", "label": "Dense Vector", "sublabel": "384 float32", "stage": 3, "row": 0, "tag": "ChromaDB" },
+    { "id": "sparse_bm25", "type": "backend", "label": "Chi Muc BM25", "sublabel": "Inverted Index", "stage": 3, "row": 2, "tag": "Okapi" },
+    { "id": "rrf_fusion", "type": "cloud", "label": "RRF Result", "sublabel": "Top-1 (Score 0.0325)", "stage": 4, "row": 1, "tag": "Serving" }
+  ],
+  "flows": [
+    { "id": "flow_zfill", "from": "raw_record", "to": "silver_record", "label": "zfill(10) & Parquet", "classification": "normalize", "variant": "emphasis" },
+    { "id": "flow_strip", "from": "raw_filing", "to": "silver_doc", "label": "DOM strip & Item 1A", "classification": "markdown", "variant": "emphasis" },
+    { "id": "flow_chunk", "from": "silver_doc", "to": "chunk_record", "label": "token-aware <= 240", "classification": "sliding window", "variant": "emphasis" },
+    { "id": "flow_embed", "from": "chunk_record", "to": "dense_emb", "label": "ma hoa vector", "classification": "embedding", "variant": "emphasis" },
+    { "id": "flow_bm25", "from": "chunk_record", "to": "sparse_bm25", "label": "tach tu khoa", "classification": "tokenizing", "variant": "default" },
+    { "id": "flow_dense_rank", "from": "dense_emb", "to": "rrf_fusion", "label": "Dense rank r=2", "classification": "1/(60+2)", "variant": "emphasis" },
+    { "id": "flow_bm25_rank", "from": "sparse_bm25", "to": "rrf_fusion", "label": "BM25 rank r=1", "classification": "1/(60+1)", "variant": "emphasis" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Phan Ra Luu Tru & Lam Sach",
+      "items": [
+        "JSON tho bi rung so 0 dau duoc phan ra thanh chuoi CIK 10 chu so",
+        "HTML 1.484 KB duoc loc bo the rac thanh Markdown 67 KB",
+        "Chuyen doi sang Parquet Snappy giup thu hep 75.7% dung luong dia"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Phan Ra Phan Doan & Truy Hoi",
+      "items": [
+        "Van ban dai duoc phan ra thanh cac chunk khong qua 240 tokens",
+        "Moi chunk duoc phan ra song song thanh Vector 384d va tu khoa BM25",
+        "Dung hoa bang RRF k=60 loai tru hoan toan diem mu truy hoi"
+      ]
+    }
+  ]
+}

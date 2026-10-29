@@ -1,0 +1,57 @@
+\section{Vận Hành Thực Tế và Khả Năng Mở Rộng}
+
+\subsection{Thời gian thực thi từng bước trong môi trường vận hành}
+Hiệu năng thời gian thực thi của đường ống được thu thập và định lượng thông qua tệp nhật ký kiểm toán có cấu trúc \texttt{logs/orchestration\_audit.jsonl}. Bảng~\ref{tab:execution_times} phản ánh chi tiết thời gian chạy trong hai kịch bản điển hình: kịch bản khởi động nguội toàn phần (Cold Run -- nạp mới toàn bộ dữ liệu từ đầu) và kịch bản chạy cảm biến gia tăng định kỳ (Incremental Sensor Run):
+
+\begin{table}[htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\caption{Đo lường thời gian thực thi chi tiết của từng bước trong đường ống}
+\label{tab:execution_times}
+\begin{tabularx}{\textwidth}{l p{3.8cm} r r X}
+\toprule
+\textbf{Bước} & \textbf{Tên Tác Vụ Nghiệp Vụ} & \textbf{Cold Run} & \textbf{Incremental Run} & \textbf{Ghi Chú Trạng Thái} \\
+\midrule
+\textbf{Bước 1} & \texttt{step\_1\_extract\_companies} & 3.207 ms & 0,5 ms & Bỏ qua do tệp > 100 KB \\
+\textbf{Bước 2} & \texttt{step\_2\_clean\_companies} & 121 ms & 128 ms & Xử lý 10.400 bản ghi sang Parquet \\
+\textbf{Bước 3} & \texttt{step\_3\_ingest\_filings} & $\sim$15.000 ms & 3.093 ms & Kiểm tra 7 CIK submission API \\
+\textbf{Bước 4} & \texttt{step\_4\_extract\_risk\_factors} & 5.803 ms & 0,0 ms & \texttt{SKIPPED} (Cảm biến ngắt sớm) \\
+\textbf{Bước 5} & \texttt{step\_5\_chunk\_risk\_factors} & 145 ms & 0,0 ms & \texttt{SKIPPED} (Cảm biến ngắt sớm) \\
+\textbf{Bước 6} & \texttt{step\_6\_build\_vector\_index} & 16.693 ms & 0,0 ms & \texttt{SKIPPED} (Cảm biến ngắt sớm) \\
+\midrule
+\multicolumn{2}{l}{\textbf{Tổng thời gian thực thi toàn chu trình}} & \textbf{$\sim$41.000 ms} & \textbf{3.221 ms} & \textbf{Nhanh hơn 12,7 lần} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Số liệu chứng minh cơ chế cảm biến chênh lệch mang lại lợi ích vận hành to lớn: trong chế độ giám sát tự động hàng ngày (\texttt{setup\_windows\_task.bat} chạy lúc 02:00 AM), nếu không có hồ sơ Form 10-K mới nào được nộp lên SEC, toàn bộ đường ống hoàn thành trong vỏn vẹn \textbf{3,22 giây}, tiết kiệm 100\% tài nguyên CPU cho các tác vụ bóc tách và nhúng véc-tơ.
+
+\subsection{Phân tích các điểm nghẽn kiến trúc khi dữ liệu tăng gấp 100 lần}
+Nếu phạm vi của đường ống được mở rộng gấp 100 lần (từ 7 công ty lên 700 tập đoàn lớn, tương đương xử lý 700 tệp báo cáo Form 10-K với dung lượng thô khoảng 3 GB đến 5 GB và sinh ra gần 100.000 phân đoạn văn bản), hệ thống kiến trúc đơn máy hiện tại sẽ bộc lộ bốn điểm nghẽn kỹ thuật rõ rệt:
+
+\begin{itemize}
+    \item \textbf{Điểm nghẽn mạng thu thập (Network Ingestion Bottleneck)}:
+    \begin{itemize}
+        \item \textit{Thách thức}: Do trần giới hạn tốc độ 10 req/s của SEC, tải tuần tự 700 tệp HTML kèm 700 cuộc gọi siêu dữ liệu sẽ kéo dài 15--20 phút. Mở rộng đa luồng không kiểm soát sẽ bị chặn mã HTTP 429 hoặc khóa địa chỉ IP.
+        \item \textit{Giải pháp}: Thiết lập bộ điều tiết tốc độ phân tán (\textit{Distributed Token Bucket Rate Limiter}) kết hợp mạng lưới máy chủ ủy thác xoay vòng (\textit{Proxy Pool}) tuân thủ quy chuẩn SEC.
+    \end{itemize}
+    
+    \item \textbf{Điểm nghẽn bộ nhớ và CPU khi phân tích DOM (Parsing Bottleneck)}:
+    \begin{itemize}
+        \item \textit{Thách thức}: Thư viện \texttt{BeautifulSoup} nạp toàn bộ cây DOM vào RAM. Xử lý đồng thời 700 tệp phức tạp trên tiến trình đơn luồng sẽ dẫn đến lỗi cạn kiệt bộ nhớ (OOM) và tiêu tốn hơn 10 phút CPU.
+        \item \textit{Giải pháp}: Chuyển đổi sang kiến trúc đa tiến trình song song (\texttt{multiprocessing}) hoặc áp dụng trình phân tích luồng sự kiện SAX (\textit{Streaming XML/HTML Parser}) để đọc tệp theo luồng mà không giữ DOM trong RAM.
+    \end{itemize}
+    
+    \item \textbf{Điểm nghẽn lưu trữ tệp đơn (Storage Bottleneck)}:
+    \begin{itemize}
+        \item \textit{Thách thức}: Hợp nhất gần 100.000 phân đoạn vào duy nhất một tệp \texttt{all\_chunks.parquet} gây nghẽn I/O và làm chậm truy cập đồng thời.
+        \item \textit{Giải pháp}: Áp dụng phân vùng dữ liệu hồ chứa (\textit{Hive-style Partitioning}) theo thư mục \path{year=YYYY/ticker=XXXX/} để tận dụng kỹ thuật cắt tỉa phân vùng (\textit{Partition Pruning}).
+    \end{itemize}
+    
+    \item \textbf{Điểm nghẽn cơ sở dữ liệu véc-tơ (Vector Indexing Bottleneck)}:
+    \begin{itemize}
+        \item \textit{Thách thức}: ChromaDB nhúng trên SQLite cục bộ gặp hiện tượng xung đột khóa tệp (\textit{file lock contention}) và suy giảm hiệu năng khi vượt ngưỡng 100.000 véc-tơ; tính toán trên CPU mất gần 30 phút.
+        \item \textit{Giải pháp}: Chuyển dịch Tầng Phục Vụ sang cụm cơ sở dữ liệu véc-tơ chuyên dụng (Qdrant, Milvus hoặc \texttt{pgvector}) kết hợp tăng tốc tính toán nhúng theo lô trên vi xử lý đồ họa GPU.
+    \end{itemize}
+\end{itemize}

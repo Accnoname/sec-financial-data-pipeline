@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "SEC EDGAR Financial Data Pipeline - Medallion Architecture",
+    "output": "figures/sec_medallion_pipeline.html",
+    "viewBox": [1080, 520],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "ingestion-path",
+        "label": "Ingestion & Bronze Lake",
+        "focus": ["sec_api", "raw_json", "raw_html"],
+        "note": "Thu thap du lieu tho tu SEC EDGAR API vao data/bronze/ tuan thu Rate Limit 10 req/s."
+      },
+      {
+        "id": "silver-transformation",
+        "label": "Silver Transformation",
+        "focus": ["cleaner", "dom_parser", "silver_parquet", "silver_md"],
+        "note": "Chuan hoa CIK 10 chu so, trich xuat Item 1A sang data/silver/ duoi dang Parquet va Markdown."
+      },
+      {
+        "id": "gold-hybrid-serving",
+        "label": "Gold & Hybrid Serving",
+        "focus": ["gold_chunker", "gold_parquet", "vector_bm25", "hybrid_llm"],
+        "note": "Phan doan Token-aware vao data/gold/, nap ChromaDB tai data/curated/, dung hop RRF k=60 phuc vu Gemini AI."
+      }
+    ]
+  },
+  "stages": [
+    { "label": "Nguồn Dữ Liệu" },
+    { "label": "Tầng Bronze (Raw)" },
+    { "label": "Tầng Silver (Clean)" },
+    { "label": "Tầng Gold (Features)" },
+    { "label": "Curated & Serving" }
+  ],
+  "nodes": [
+    { "id": "sec_api", "type": "cloud", "label": "SEC EDGAR API", "sublabel": "REST HTTPS", "stage": 0, "row": 1, "tag": "Rate Limit" },
+    { "id": "raw_json", "type": "database", "label": "all_companies.json", "sublabel": "1.18 MB JSON", "stage": 1, "row": 0, "tag": "Bronze" },
+    { "id": "raw_html", "type": "database", "label": "Form 10-K HTML", "sublabel": "20.9 MB HTML", "stage": 1, "row": 2, "tag": "Bronze" },
+    { "id": "cleaner", "type": "backend", "label": "CIK Cleaner", "sublabel": "Dedup & zfill(10)", "stage": 2, "row": 0, "tag": "Silver" },
+    { "id": "dom_parser", "type": "backend", "label": "DOM Extractor", "sublabel": "BeautifulSoup Item 1A", "stage": 2, "row": 2, "tag": "Silver" },
+    { "id": "silver_parquet", "type": "database", "label": "companies_clean", "sublabel": "287 KB Parquet", "stage": 3, "row": 0, "tag": "Snappy" },
+    { "id": "silver_md", "type": "database", "label": "Risk Factors MD", "sublabel": "993 KB Markdown", "stage": 3, "row": 1, "tag": "Silver" },
+    { "id": "gold_chunker", "type": "backend", "label": "Token Chunker", "sublabel": "max 240 tokens", "stage": 3, "row": 2, "tag": "Gold" },
+    { "id": "gold_parquet", "type": "database", "label": "all_chunks.parquet", "sublabel": "925 Chunks", "stage": 4, "row": 0, "tag": "Gold" },
+    { "id": "vector_bm25", "type": "database", "label": "ChromaDB & BM25", "sublabel": "Vector + Inverted", "stage": 4, "row": 1, "tag": "Curated" },
+    { "id": "hybrid_llm", "type": "backend", "label": "Hybrid RRF + LLM", "sublabel": "RRF k=60 & Gemini", "stage": 4, "row": 2, "tag": "Serving" }
+  ],
+  "flows": [
+    { "id": "flow_tickers", "from": "sec_api", "to": "raw_json", "label": "company tickers", "classification": "raw json", "variant": "default" },
+    { "id": "flow_filings", "from": "sec_api", "to": "raw_html", "label": "filing HTML", "classification": "raw html", "variant": "default" },
+    { "id": "flow_clean", "from": "raw_json", "to": "cleaner", "label": "CIK zfill", "classification": "normalize", "variant": "emphasis" },
+    { "id": "flow_dom", "from": "raw_html", "to": "dom_parser", "label": "DOM extract", "classification": "parse 1A", "variant": "emphasis" },
+    { "id": "flow_parquet", "from": "cleaner", "to": "silver_parquet", "label": "Snappy export", "classification": "columnar", "variant": "emphasis" },
+    { "id": "flow_md", "from": "dom_parser", "to": "silver_md", "label": "Markdown save", "classification": "markdown", "variant": "default" },
+    { "id": "flow_chunk", "from": "silver_md", "to": "gold_chunker", "label": "sliding window", "classification": "token-aware", "variant": "emphasis", "labelAt": [725, 314] },
+    { "id": "flow_gold", "from": "gold_chunker", "to": "gold_parquet", "label": "925 chunks", "classification": "deterministic ID", "variant": "emphasis" },
+    { "id": "flow_index", "from": "gold_parquet", "to": "vector_bm25", "label": "embed & index", "classification": "all-MiniLM-L6-v2", "variant": "default", "labelAt": [940, 200] },
+    { "id": "flow_query", "from": "vector_bm25", "to": "hybrid_llm", "label": "RRF ranking", "classification": "top-k fusion", "variant": "emphasis", "labelAt": [940, 314] }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Medallion Architecture",
+      "items": [
+        "Phan tach doc lap 4 tang: Bronze (data/bronze/), Silver (data/silver/), Gold (data/gold/) va Curated (data/curated/)",
+        "Bao toan 100% du lieu tho tai Bronze giup tai lap toan ven khong can tai lai SEC API",
+        "Toi uu hoa dung luong luu tru bang Parquet nén Snappy va Token-Aware Chunking <= 240 tokens"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Hybrid Retrieval & AI Serving",
+      "items": [
+        "Ket hop song song Dense Vector 384 chieu trong ChromaDB va Sparse BM25 tu Gold chunks",
+        "Dung hop thu hang bang Reciprocal Rank Fusion voi tham so k=60",
+        "Goi Gemini LLM kem phu luc doi chieu ho so goc va link file kiem toan"
+      ]
+    }
+  ]
+}

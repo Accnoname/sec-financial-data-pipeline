@@ -10,12 +10,12 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 # Ensure project root is in sys.path
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.common.config import PRIMARY_DIR
-from src.rag.hybrid_retriever import HybridRetriever
+from src.common.config import GOLD_DIR
+from src.curated.hybrid_retriever import HybridRetriever
 
 # Lazy global retriever instance to avoid re-initializing encoder and ChromaDB per query
 _RETRIEVER: HybridRetriever | None = None
@@ -35,7 +35,7 @@ def load_all_chunk_texts() -> List[Dict[str, Any]]:
     """
     Load toàn bộ chunks (gồm chunk_id, text, metadata) từ file Gold Parquet.
     """
-    parquet_path = PRIMARY_DIR / "chunks" / "all_chunks.parquet"
+    parquet_path = GOLD_DIR / "chunks" / "all_chunks.parquet"
     if not parquet_path.exists():
         raise FileNotFoundError(f"Chưa tìm thấy file {parquet_path}. Hãy chạy chunking trước.")
     df = pd.read_parquet(parquet_path)
@@ -275,10 +275,16 @@ def evaluate_mode(mode_func, questions: List[Dict[str, Any]], top_k: int = 15) -
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--questions", default="eval_questions.json", help="Path to questions file")
+    default_questions = Path(__file__).resolve().parent / "eval_questions.json"
+    if not default_questions.exists():
+        default_questions = PROJECT_ROOT / "eval_questions.json"
+
+    default_outdir = PROJECT_ROOT / "results"
+
+    parser = argparse.ArgumentParser(description="Evaluate Dense, BM25, and Hybrid Retrieval on SEC 10-K Chunks.")
+    parser.add_argument("--questions", default=str(default_questions), help="Path to questions file")
     parser.add_argument("--label", default="tokenaware", help="Experiment label (e.g., baseline, tokenaware)")
-    parser.add_argument("--outdir", default="results", help="Directory to save eval results")
+    parser.add_argument("--outdir", default=str(default_outdir), help="Directory to save eval results")
     args = parser.parse_args()
 
     os.makedirs(args.outdir, exist_ok=True)

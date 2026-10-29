@@ -1,0 +1,66 @@
+\section{Bộ Điều Phối Tác Vụ và Quản Trị Cấu Hình}
+
+\subsection{Cơ chế điều khiển luồng công việc qua run.py và PipelineDAG}
+Đường ống cung cấp giao diện dòng lệnh hợp nhất thông qua tệp tin trung tâm \texttt{run.py}, đóng vai trò là điểm nhập lệnh (\textit{entry point}) cho toàn bộ các chế độ vận hành: từ thực thi đơn lẻ từng bước nghiệp vụ (\texttt{python run.py 1..7}), chạy chuỗi liên hoàn (\texttt{python run.py all}), kích hoạt tiến trình chạy ngầm định kỳ (\texttt{python run.py schedule}), cho tới chế độ điều phối cao cấp thông qua đồ thị có hướng không chu trình (\texttt{python run.py dag}).
+
+Trong chế độ điều phối DAG (\texttt{src/orchestration/dag.py}), hệ thống tự động khởi tạo đối tượng \texttt{PipelineDAG} và liên kết 6 tác vụ tương ứng với 6 giai đoạn xử lý dữ liệu. Trình điều phối giải quyết các mối quan hệ phụ thuộc cha-con (\texttt{upstream\_ids}) và tiến hành thực thi tuần tự theo thứ tự tô-pô (\textit{topological execution}).
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        node distance=0.3cm and 0.35cm,
+        task/.style={rectangle, draw=blue!70!black, fill=blue!5, thick, rounded corners=2pt, text width=2.3cm, minimum height=0.75cm, align=center, font=\tiny},
+        arrow/.style={-{Stealth[scale=0.8]}, thick, draw=blue!70!black}
+    ]
+        \node[task] (t1) {\textbf{T1: Extract Co.}\\SEC Master JSON};
+        \node[task, right=of t1] (t2) {\textbf{T2: Clean Co.}\\Parquet 10-digit CIK};
+        \node[task, right=of t2] (t3) {\textbf{T3: Ingest 10-K}\\Delta Sensor Check};
+        \node[task, below=0.4cm of t3] (t4) {\textbf{T4: Extract 1A}\\Markdown Risk};
+        \node[task, left=of t4] (t5) {\textbf{T5: Chunking}\\Gold Parquet $\le$240t};
+        \node[task, left=of t5] (t6) {\textbf{T6: Vector Index}\\ChromaDB Storage};
+        
+        \draw[arrow] (t1) -- node[above, font=\tiny] {Gate} (t2);
+        \draw[arrow] (t2) -- node[above, font=\tiny] {Gate} (t3);
+        \draw[arrow] (t3) -- node[right, font=\tiny] {Delta} (t4);
+        \draw[arrow] (t4) -- (t5);
+        \draw[arrow] (t5) -- node[above, font=\tiny] {Gate} (t6);
+    \end{tikzpicture}
+    \caption{Đồ thị DAG thực thi tuần tự các tác vụ kèm chốt kiểm soát chất lượng (Quality Gates).}
+    \label{fig:dag_pipeline}
+\end{figure}
+
+Một đặc tính quan trọng của \texttt{PipelineDAG} là cơ chế ngắt mạch sớm (\textit{short-circuiting}). Nếu tác vụ số 3 (\path{step_3_ingest_filings}) xác nhận không có bất kỳ báo cáo 10-K mới nào trên máy chủ SEC và các tệp dữ liệu phái sinh của các tầng trước đã tồn tại đầy đủ, bộ điều phối lập tức đánh dấu các tác vụ 4, 5 và 6 sang trạng thái bỏ qua (\texttt{SKIPPED}), hoàn tất chu trình kiểm tra trạng thái chỉ trong 3,09 giây mà không tiêu tốn tài nguyên tính toán.
+
+\subsection{Chiến lược quản trị cấu hình và nhật ký kiểm toán có cấu trúc}
+Dự án quản trị cấu hình bằng mã nguồn Python chuẩn hóa kết hợp biến môi trường và tệp nhật ký có cấu trúc theo ba thành phần trọng tâm:
+\begin{itemize}
+    \item \textbf{Quản trị đường dẫn vật lý (Path Management)}: Tệp \path{src/common/config.py} sử dụng lớp \texttt{pathlib.Path} thiết lập đường dẫn tuyệt đối cho các tầng Medallion (\texttt{RAW\_DIR}, \texttt{STAGING\_DIR}, \texttt{PRIMARY\_DIR}, \texttt{CURATED\_DIR}) từ gốc dự án, bảo đảm tính tương thích trên đa nền tảng điều hành (Windows/Linux/macOS).
+    \item \textbf{Bảo mật và cấu hình môi trường (.env)}: Các thông tin nhạy cảm và định danh mô hình được lưu trữ độc lập trong tệp \texttt{.env} (\texttt{GEMINI\_API\_KEY}, mô hình nhúng \texttt{all-MiniLM-L6-v2} và mô hình tổng hợp \texttt{gemini-2.5-flash}), được nạp tự động qua thư viện \texttt{python-dotenv}.
+    \item \textbf{Nhật ký kiểm toán có cấu trúc (Structured Audit Logging)}: Tệp \path{logs/orchestration_audit.jsonl} ghi nhận toàn bộ vết thực thi theo định dạng JSON Lines với các trường chuẩn: \texttt{run\_id}, \texttt{dag\_id}, \texttt{timestamp}, \texttt{task\_id}, \texttt{status}, \texttt{duration\_ms}, \texttt{retry\_count}, \texttt{records\_processed}, và \texttt{error\_message}.
+\end{itemize}
+
+\subsection{Đối sánh chuyên sâu với nền tảng Apache Airflow}
+Bảng~\ref{tab:airflow_comparison} đối sánh các điểm tương đồng và khoảng trống kỹ thuật so với Apache Airflow:
+
+\begin{table}[htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\caption{So sánh giữa bộ điều phối PipelineDAG nội bộ và Apache Airflow}
+\label{tab:airflow_comparison}
+\begin{tabularx}{\textwidth}{p{2.8cm} X X}
+\toprule
+\textbf{Khía Cạnh Kỹ Thuật} & \textbf{Động Cơ PipelineDAG Cục Bộ} & \textbf{Apache Airflow Doanh Nghiệp} \\
+\midrule
+\textbf{Cấu trúc đồ thị (DAG)} & Quản lý phụ thuộc tô-pô đơn luồng, trạng thái rõ ràng & Hỗ trợ DAG phức tạp, đa nhánh, chạy phân tán \\
+\textbf{Xử lý lỗi \& Thử lại} & Tự động thử lại với Exponential Backoff \& Full Jitter & Cấu hình retry, retry\_delay, trigger\_rule phong phú \\
+\textbf{Chốt chất lượng (Gate)} & Tích hợp \texttt{pre\_gate} và \texttt{post\_gate} kiểm tra schema/size & Sử dụng \texttt{SQLCheckOperator}, DataHub sensor \\
+\textbf{Bộ thực thi (Executor)} & Đơn tiến trình tuần tự cục bộ (Single-node runner) & CeleryExecutor, KubernetesExecutor phân tán tải \\
+\textbf{Hàng đợi thông điệp} & Không dùng (gọi hàm Python trực tiếp trong bộ nhớ) & Quản lý hàng đợi phân tán qua RabbitMQ/Redis \\
+\textbf{Giao diện giám sát} & Nhật ký văn bản và tệp JSON Lines tại \texttt{logs/} & Webserver UI xem sơ đồ cây, Gantt chart, live log \\
+\textbf{Chạy bù lịch sử} & Chạy thủ công từng bước với tham số \texttt{--force} & Lệnh CLI backfill tự động theo khoảng thời gian \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Thiết kế tinh gọn này giúp đường ống khởi động ngay tức thì trong vòng dưới 1 giây mà không chịu chi phí vận hành (\textit{overhead}) cồng kềnh của một cụm máy chủ Airflow hoàn chỉnh, hoàn toàn phù hợp cho các luồng xử lý dữ liệu tài chính định kỳ theo lịch trình.

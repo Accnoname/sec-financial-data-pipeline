@@ -1,0 +1,42 @@
+\section{Quản Trị Chất Lượng Dữ Liệu và Bộ Kiểm Thử Tự Động}
+
+\subsection{Triết lý kiểm thử theo hướng hợp đồng dữ liệu (Data Contract Testing)}
+Trong các hệ thống phân tích hiện đại, kiểm thử dữ liệu không chỉ đơn thuần là kiểm tra tính đúng đắn của mã lệnh phần mềm (\textit{software logic testing}) mà quan trọng hơn là kiểm thử các giả định về dữ liệu (\textit{data assumptions testing}). Bất kỳ một biến động ngầm nào trong cấu trúc siêu văn bản của SEC hay sự thay đổi kiểu dữ liệu đều có thể dẫn đến sự sập đổ dây chuyền của các mô hình phân tích hạ nguồn.
+
+Dự án thiết lập một hệ thống bảo vệ chất lượng toàn diện gồm 24 ca kiểm thử tự động hóa bằng công cụ Pytest, phân bổ thành hai tầng:
+\begin{itemize}
+    \item \textbf{Tầng kiểm thử đơn vị độc lập (\texttt{tests/unit/}, 16 ca test)}: Kiểm tra tính đúng đắn của các hàm chuẩn hóa CIK, giải thuật phân đoạn văn bản, cơ chế thử lại của DAG và công thức xếp hạng.
+    \item \textbf{Tầng kiểm thử tích hợp hợp đồng dữ liệu (\texttt{tests/test\_pipeline.py}, 8 ca test)}: Kiểm soát tính toàn vẹn vật lý, độ dài tệp tin và lược đồ dữ liệu qua từng tầng Medallion.
+\end{itemize}
+
+\subsection{Phân tích chuyên sâu 8 ca kiểm thử tích hợp đường ống}
+Bảng~\ref{tab:pytest_analysis} liệt kê chi tiết 8 ca kiểm thử tích hợp cốt lõi trong \texttt{test\_pipeline.py}, phân định rạch ròi những gì bài kiểm tra đang bảo đảm và những gì bài kiểm tra chưa bao phủ:
+
+\begin{table}[htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\caption{Phân tích phạm vi bảo đảm và giới hạn của 8 ca kiểm thử tích hợp trong test\_pipeline.py}
+\label{tab:pytest_analysis}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.0cm} X X}
+\toprule
+\textbf{Tên Ca Kiểm Thử} & \textbf{Được Bảo Đảm (Verified)} & \textbf{Chưa Bảo Đảm (Omitted)} \\
+\midrule
+\path{test_raw_companies_json_exists} & Tệp thô \path{all_companies.json} tồn tại, size > 100 KB. & Chưa kiểm tra schema sâu của từng phần tử JSON. \\
+\path{test_raw_sec_filings_exist} & Đủ 7 thư mục, mỗi tệp HTML Form 10-K gốc > 500 KB. & Chưa kiểm tra tính toàn vẹn cú pháp HTML nội dung. \\
+\path{test_staging_parquet_schema} & Tồn tại Parquet Silver, đủ 5 cột, mẫu 50 CIK đủ 10 số. & Chưa xác thực chéo CIK với cơ sở dữ liệu online SEC. \\
+\path{test_markdown_risk_factors} & Đủ 7 tệp Markdown Item 1A, chứa từ khóa rủi ro > 10 KB. & Chưa kiểm tra độ tinh khiết ngữ nghĩa ranh giới Item 1B. \\
+\path{test_gold_chunks_schema_content} & Tồn tại Parquet Gold, 8 cột, 7 mã, text không rỗng. & Chưa đo mức độ trùng lặp nội dung sliding window. \\
+\path{test_curated_vector_db} & Kết nối ChromaDB thành công, collection có $\ge$900 vector. & Chưa đánh giá độ chính xác toán học của vector nhúng. \\
+\path{test_gold_chunks_fit_embedding} & \textbf{Hợp đồng dữ liệu:} 100\% của 925 chunk $\le$ 256 tokens. & Chưa đo lường độ trễ suy diễn (latency) trên GPU/CPU. \\
+\path{test_rag_prompt_construction} & Khuôn mẫu prompt ghép đúng nguồn \texttt{[Source 1]} \& query. & Chưa kiểm tra rủi ro tấn công prompt injection. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Hợp đồng dữ liệu ràng buộc độ dài véc-tơ nhúng}
+Đặc biệt, ca kiểm thử số 7 (\texttt{test\_gold\_chunks\_fit\_embedding\_context\_window}) đóng vai trò là một cổng kiểm soát chất lượng (Quality Gate) tiên quyết. Bài kiểm tra khởi tạo chính xác bộ tách từ của mô hình \texttt{all-MiniLM-L6-v2} và duyệt qua toàn bộ 925 hàng trong tệp \texttt{all\_chunks.parquet}:
+\begin{equation}
+    \forall c \in \text{GoldChunks}, \quad \text{len}(\text{Tokenizer}.\text{encode}(c.\text{text})) \le 256
+\end{equation}
+Nếu phát hiện bất kỳ phân đoạn nào vi phạm giới hạn 256 tokens, quá trình kiểm thử sẽ lập tức kích hoạt lỗi khẳng định \texttt{AssertionError} và hiển thị danh sách các phân đoạn vi phạm, ngăn chặn việc đẩy dữ liệu lỗi lên Tầng Phục vụ. Toàn bộ 24 ca kiểm thử trong hệ thống thực thi hoàn tất trong 27,5 giây, tạo nên một lưới an toàn kỹ thuật tin cậy cho toàn bộ đường ống.

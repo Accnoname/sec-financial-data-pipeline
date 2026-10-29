@@ -1,0 +1,358 @@
+\section{Luồng Dữ Liệu và Hợp Đồng Từng Tầng}
+
+\subsection{Mô hình kiến trúc hồ chứa dữ liệu Medallion}
+Hệ thống tổ chức lưu trữ và xử lý dữ liệu theo mô hình Medallion Lakehouse~\cite{armbrust2021lakehouse}, phân định rõ ràng các cấp độ tinh lọc của dữ liệu từ dạng thô sơ khai đến dạng phân tích chuyên sâu. Luồng dữ liệu vận hành đơn hướng qua 4 tầng kế tiếp nhau: Tầng Đồng (Bronze), Tầng Bạc (Silver), Tầng Vàng (Gold) và Tầng Phục vụ (Curated), được nâng đỡ và giám sát bởi khung điều phối đồ thị DAG cùng hệ thống quản trị chất lượng toàn cục. Mỗi tầng lưu trữ hoạt động như một ranh giới cách ly trạng thái (\textit{state isolation boundary}), tuân thủ các quy tắc bất biến về định dạng tệp tin, cấu trúc lược đồ dữ liệu và tiêu chuẩn chất lượng.
+
+Hình~\ref{fig:master_pipeline_architecture} trình bày bức tranh kiến trúc toàn cảnh chi tiết của đường ống dữ liệu, bao gồm các điểm cuối RESTful của hệ thống SEC EDGAR, các tầng hồ chứa Medallion Lakehouse, cơ chế cảm biến delta ngắn mạch, các bộ lọc phòng vệ dị thường biên, quy chuẩn phân đoạn văn bản kiểm soát ngân sách token nghiêm ngặt, cùng hai kênh phục vụ truy vấn hạ nguồn song song.
+
+\clearpage
+\begin{figure*}[p]
+\centering
+\begin{tikzpicture}[
+    >=Stealth,
+    scale=0.985,
+    transform shape,
+    headercard/.style={rectangle, rounded corners=3pt, thick, align=center, inner sep=3pt},
+    stagebox/.style={rectangle, rounded corners=2.5pt, draw=black!35, fill=white, thin, align=left, inner sep=3.5pt},
+    interarrow/.style={->, thick, draw=black!60},
+    transbadge/.style={rectangle, rounded corners=2pt, fill=white, draw=black!45, thin, font=\fontsize{6.5pt}{7.5pt}\selectfont\bfseries, inner sep=2.5pt},
+    downarrow/.style={->, line width=1.1pt}
+]
+
+% ==============================================================================
+% TẦNG 0: SEC EDGAR API & PERIMETER (Center y = -1.1, Height = 2.2cm)
+% ==============================================================================
+\node[headercard, draw=secborder, fill=secbg, minimum width=2.1cm, text width=1.9cm, minimum height=2.2cm] (sec_h) at (1.05, -1.1) {
+    \textbf{\scriptsize SEC EDGAR}\\[2pt]
+    \tiny External API\\
+    \tiny\color{secborder!80!black} Cổng Dữ Liệu\\
+    \tiny\color{secborder!80!black} Pháp Lý Hoa Kỳ
+};
+
+\node[stagebox, text width=4.3cm, minimum height=2.2cm] (sec_s1) at (4.7, -1.1) {
+    \textbf{\scriptsize 1. SEC REST Endpoints}\\[2pt]
+    \tiny -- \texttt{/files/company\_tickers.json} (10.400+ CIK)\\
+    \tiny -- \texttt{/submissions/CIK\{cik10\}.json} (Metadata)\\
+    \tiny -- \texttt{/Archives/edgar/data/.../*.htm} (10-K gốc)
+};
+
+\node[stagebox, text width=4.3cm, minimum height=2.2cm] (sec_s2) at (9.8, -1.1) {
+    \textbf{\scriptsize 2. Tuân Thủ Hạn Ngạch \& Giao Thức}\\[2pt]
+    \tiny -- Header: \texttt{User-Agent: Sample Admin@...}\\
+    \tiny -- Token Bucket Rate Limiter: $\le \mathbf{10\ \text{req/s}}$\\
+    \tiny -- Exponential Backoff + Jitter ($t_{\text{wait}} \le 60$s)
+};
+
+\node[stagebox, text width=4.3cm, minimum height=2.2cm] (sec_s3) at (14.9, -1.1) {
+    \textbf{\scriptsize 3. Phòng Vệ Ngắt Mạng \& Thử Lại}\\[2pt]
+    \tiny -- Bắt mã lỗi HTTP \textbf{429} (Too Many Requests)\\
+    \tiny -- Tự động thử lại 3 lần với HTTP \textbf{500}, \textbf{503}\\
+    \tiny -- Cách ly gián đoạn mạng, bảo vệ máy chủ SEC
+};
+
+\draw[interarrow, draw=secborder] (sec_s1.east) -- (sec_s2.west);
+\draw[interarrow, draw=secborder] (sec_s2.east) -- (sec_s3.west);
+
+\begin{scope}[on background layer]
+    \node[draw=secborder!50, fill=secbg!35, rounded corners=4pt, fit=(sec_h) (sec_s1) (sec_s3), inner sep=3.5pt] (sec_box) {};
+\end{scope}
+
+% ==============================================================================
+% TẦNG 1: TẦNG ĐỒNG (BRONZE LAYER) (Center y = -4.4, Height = 2.5cm)
+% ==============================================================================
+\node[headercard, draw=bronzeborder, fill=bronzebg, minimum width=2.1cm, text width=1.9cm, minimum height=2.5cm] (bronze_h) at (1.05, -4.4) {
+    \textbf{\scriptsize TẦNG ĐỒNG}\\[1pt]
+    \textbf{\scriptsize (BRONZE)}\\[2pt]
+    \tiny \texttt{data/01\_raw/}\\
+    \textbf{\scriptsize\color{bronzeborder} 22,51 MB}\\
+    \tiny Hồ Chứa Thô
+};
+
+\node[stagebox, text width=4.3cm, minimum height=2.5cm] (bronze_s1) at (4.7, -4.4) {
+    \textbf{\scriptsize 1. Cảm Biến Delta \& Short-Circuit}\\[2pt]
+    \tiny -- Đọc \texttt{accessionNumber} từ JSON nộp mới nhất\\
+    \tiny -- Đối chiếu tệp cục bộ: Nếu đã nạp $\rightarrow$ Bỏ qua\\
+    \tiny -- \textbf{Ngắt ngắn mạch (Short-Circuit) trong 3,09s}\\
+    \tiny -- Loại bỏ 100\% lưu lượng tải dư thừa
+};
+
+\node[stagebox, text width=4.3cm, minimum height=2.5cm] (bronze_s2) at (9.8, -4.4) {
+    \textbf{\scriptsize 2. Ghi Nguyên Tử (Atomic Ingestion)}\\[2pt]
+    \tiny -- Tải luồng nhị phân vào tệp tạm thời \texttt{*.tmp}\\
+    \tiny -- Lệnh đổi tên nguyên tử POSIX (\texttt{atomic rename})\\
+    \tiny -- Chống hỏng tệp khi mất kết nối đột ngột\\
+    \tiny -- Đảm bảo tính nhất quán tệp tin
+};
+
+\node[stagebox, text width=4.3cm, minimum height=2.5cm] (bronze_s3) at (14.9, -4.4) {
+    \textbf{\scriptsize 3. Hợp Đồng Tệp Thô (Raw Contract)}\\[2pt]
+    \tiny -- \texttt{all\_companies.json} (Danh mục 10.400+ CIK)\\
+    \tiny -- \texttt{\{TICKER\}/\{acc\}\_*.htm} (Báo cáo 10-K gốc)\\
+    \tiny -- \textbf{Bảo toàn nguồn gốc} (\textit{Data Provenance})\\
+    \tiny -- Giữ 100\% nguyên trạng bit gốc
+};
+
+\draw[interarrow, draw=bronzeborder] (bronze_s1.east) -- (bronze_s2.west);
+\draw[interarrow, draw=bronzeborder] (bronze_s2.east) -- (bronze_s3.west);
+
+\begin{scope}[on background layer]
+    \node[draw=bronzeborder!50, fill=bronzebg!35, rounded corners=4pt, fit=(bronze_h) (bronze_s1) (bronze_s3), inner sep=3.5pt] (bronze_box) {};
+\end{scope}
+
+% Downlink 0 -> 1
+\draw[downarrow, draw=secborder] (sec_box.south) -- (bronze_box.north);
+\node[transbadge, text=secborder] at ($(sec_box.south)!0.5!(bronze_box.north)$) {Tải Luồng Dữ Liệu HTTP -- Tuân Thủ Hạn Ngạch 10 req/s};
+
+% ==============================================================================
+% TẦNG 2: TẦNG BẠC (SILVER LAYER) (Center y = -8.1, Height = 2.9cm)
+% ==============================================================================
+\node[headercard, draw=silverborder, fill=silverbg, minimum width=2.1cm, text width=1.9cm, minimum height=2.9cm] (silver_h) at (1.05, -8.1) {
+    \textbf{\scriptsize TẦNG BẠC}\\[1pt]
+    \textbf{\scriptsize (SILVER)}\\[2pt]
+    \tiny \texttt{data/02\_staging/}\\
+    \textbf{\scriptsize\color{silverborder} 1,28 MB}\\
+    \tiny Giảm 94,3\% kích thước\\
+    \tiny Bán Cấu Trúc Sạch
+};
+
+\node[stagebox, text width=3.15cm, minimum height=2.9cm] (silver_s1) at (4.1, -8.1) {
+    \textbf{\scriptsize 1. Chuẩn Hóa CIK}\\[2pt]
+    \tiny -- Sửa lỗi CIK Float/NaN:\\
+    \tiny $\ \ \ \texttt{split('.')[0].zfill(10)}$\\
+    \tiny -- Khử trùng lặp mã kép:\\
+    \tiny $\ \ $ GOOG / GOOGL chung CIK\\
+    \tiny -- Xuất bản lược đồ chuẩn:\\
+    \tiny $\ \ $ \texttt{companies\_clean.parquet}
+};
+
+\node[stagebox, text width=3.15cm, minimum height=2.9cm] (silver_s2) at (7.9, -8.1) {
+    \textbf{\scriptsize 2. Bóc Tách DOM}\\[2pt]
+    \tiny -- Phân tích DOM qua \texttt{lxml}\\
+    \tiny -- Xóa triệt để thẻ rác ngầm:\\
+    \tiny $\ \ \ \texttt{<script>}$, $\texttt{<style>}$,\\
+    \tiny $\ \ \ \texttt{<ix:header>}$, $\texttt{<noscript>}$\\
+    \tiny -- Khớp ranh giới Mục 1A:\\
+    \tiny $\ \ $ Bắt đầu: \texttt{Item 1A. Risk...}\\
+    \tiny $\ \ $ Kết thúc: \texttt{Item 1B / Item 2}
+};
+
+\node[stagebox, text width=3.15cm, minimum height=2.9cm] (silver_s3) at (11.7, -8.1) {
+    \textbf{\scriptsize 3. Phòng Vệ Biên}\\[2pt]
+    \tiny -- \textbf{Bẫy Mục Lục}: Bỏ qua $< 5.000$ ký tự\\
+    \tiny -- \textbf{Sửa Thẻ Nối}: Ghép thẻ \texttt{<span>}\\
+    \tiny -- \textbf{Suy Giảm Khả Dụng}:\\
+    \tiny $\ \ $ Fallback lấy 50k ký tự đầu\\
+    \tiny $\ \ $ khi lỗi DOM (ghi WARNING)
+};
+
+\node[stagebox, text width=3.15cm, minimum height=2.9cm] (silver_s4) at (15.5, -8.1) {
+    \textbf{\scriptsize 4. Hợp Đồng Tầng Bạc}\\[2pt]
+    \tiny -- \texttt{companies\_clean.parquet}\\
+    \tiny $\ \ $ (CIK 10 số, Ticker, Title)\\
+    \tiny -- \texttt{\{TICKER\}\_\{Y\}\_item1a.md}\\
+    \tiny $\ \ $ (Văn bản Markdown sạch 1A)\\
+    \tiny -- Đạt chuẩn lược đồ Tầng Bạc
+};
+
+\draw[interarrow, draw=silverborder] (silver_s1.east) -- (silver_s2.west);
+\draw[interarrow, draw=silverborder] (silver_s2.east) -- (silver_s3.west);
+\draw[interarrow, draw=silverborder] (silver_s3.east) -- (silver_s4.west);
+
+\begin{scope}[on background layer]
+    \node[draw=silverborder!50, fill=silverbg!35, rounded corners=4pt, fit=(silver_h) (silver_s1) (silver_s2) (silver_s3) (silver_s4), inner sep=3.5pt] (silver_box) {};
+\end{scope}
+
+% Downlink 1 -> 2
+\draw[downarrow, draw=bronzeborder] (bronze_box.south) -- (silver_box.north);
+\node[transbadge, text=bronzeborder] at ($(bronze_box.south)!0.5!(silver_box.north)$) {Bóc Tách DOM \& Lọc Regex -- Giảm 94,3\% Dung Lượng Thô};
+
+% ==============================================================================
+% TẦNG 3: TẦNG VÀNG (GOLD LAYER) (Center y = -12.0, Height = 2.9cm)
+% ==============================================================================
+\node[headercard, draw=goldborder, fill=goldbg, minimum width=2.1cm, text width=1.9cm, minimum height=2.9cm] (gold_h) at (1.05, -12.0) {
+    \textbf{\scriptsize TẦNG VÀNG}\\[1pt]
+    \textbf{\scriptsize (GOLD)}\\[2pt]
+    \tiny \texttt{data/03\_primary/}\\
+    \textbf{\scriptsize\color{goldborder!80!black} 2,83 MB Parquet}\\
+    \tiny 925 hàng $\times$ 8 cột\\
+    \tiny Sẵn Sàng Phân Tích
+};
+
+\node[stagebox, text width=3.15cm, minimum height=2.9cm] (gold_s1) at (4.1, -12.0) {
+    \textbf{\scriptsize 1. Phân Tách Câu}\\[2pt]
+    \tiny -- Regex Boundary Splitter:\\
+    \tiny $\ \ $ Ngắt câu logic theo dấu chấm\\
+    \tiny -- Bảo toàn cấu trúc liệt kê,\\
+    \tiny $\ \ $ gạch đầu dòng, bảng số liệu\\
+    \tiny -- Bảo toàn ngữ nghĩa câu
+};
+
+\node[stagebox, text width=3.15cm, minimum height=2.9cm] (gold_s2) at (7.9, -12.0) {
+    \textbf{\scriptsize 2. Tích Lũy Tokenizer}\\[2pt]
+    \tiny -- WordPiece (\texttt{all-MiniLM-L6})\\
+    \tiny -- Target $L = \mathbf{210\ \text{t}}$, Overlap $S = \mathbf{40\ \text{t}}$\\
+    \tiny -- \textbf{Trần ngắt cứng}: $\le \mathbf{240\ \text{tokens}}$\\
+    \tiny -- Đệm an toàn 14 tokens trước trần 256
+};
+
+\node[stagebox, text width=3.15cm, minimum height=2.9cm] (gold_s3) at (11.7, -12.0) {
+    \textbf{\scriptsize 3. Chốt Quality Gate}\\[2pt]
+    \tiny -- Chunk ID: \texttt{\{T\}\_\{Y\}\_RF\_\{IDX:04d\}}\\
+    \tiny $\ \ $ (\texttt{MSFT\_2024\_RF\_0012})\\
+    \tiny -- \textbf{Pytest (100\% Pass):}\\
+    \tiny $\ \ $ $\bullet$ $\max(\text{tokens}) \le 240\ \text{t}$\\
+    \tiny $\ \ $ $\bullet$ \texttt{chunk\_id} duy nhất\\
+    \tiny $\ \ $ $\bullet$ Không ô rỗng (\texttt{no null})
+};
+
+\node[stagebox, text width=3.15cm, minimum height=2.9cm] (gold_s4) at (15.5, -12.0) {
+    \textbf{\scriptsize 4. Hợp Đồng Parquet Vàng}\\[2pt]
+    \tiny -- \texttt{all\_chunks.parquet} (Snappy)\\
+    \tiny -- \textbf{Lược đồ chuẩn 8 cột}:\\
+    \tiny $\ \ $ \texttt{chunk\_id}, \texttt{ticker}, \texttt{year},\\
+    \tiny $\ \ $ \texttt{index}, \texttt{text}, \texttt{tokens},\\
+    \tiny $\ \ $ \texttt{chars}, \texttt{created\_at}\\
+    \tiny -- Tương thích chuẩn Arrow
+};
+
+\draw[interarrow, draw=goldborder] (gold_s1.east) -- (gold_s2.west);
+\draw[interarrow, draw=goldborder] (gold_s2.east) -- (gold_s3.west);
+\draw[interarrow, draw=goldborder] (gold_s3.east) -- (gold_s4.west);
+
+\begin{scope}[on background layer]
+    \node[draw=goldborder!50, fill=goldbg!35, rounded corners=4pt, fit=(gold_h) (gold_s1) (gold_s2) (gold_s3) (gold_s4), inner sep=3.5pt] (gold_box) {};
+\end{scope}
+
+% Downlink 2 -> 3
+\draw[downarrow, draw=silverborder] (silver_box.south) -- (gold_box.north);
+\node[transbadge, text=silverborder] at ($(silver_box.south)!0.5!(gold_box.north)$) {Phân Đoạn Tokenizer-Aware -- Khóa Trần $\le$ 240 Tokens};
+
+% ==============================================================================
+% TẦNG 4: TẦNG PHỤC VỤ (CURATED LAYER) - PARALLEL SERVING (Center y = -16.2, Height = 3.5cm)
+% ==============================================================================
+\node[headercard, draw=curatedborder, fill=curatedbg, minimum width=2.1cm, text width=1.9cm, minimum height=3.5cm] (curated_h) at (1.05, -16.2) {
+    \textbf{\scriptsize TẦNG PHỤC VỤ}\\[1pt]
+    \textbf{\scriptsize (CURATED)}\\[2pt]
+    \tiny \texttt{data/04\_curated/}\\
+    \textbf{\scriptsize\color{curatedborder} 11,71 MB Chroma}\\
+    \tiny Phục Vụ Truy Vấn\\
+    \tiny Hai Kênh Song Song
+};
+
+\node[stagebox, draw=olapborder, fill=olapbg, text width=4.6cm, minimum height=3.5cm] (serving_olap) at (4.9, -16.2) {
+    \textbf{\scriptsize KÊNH 1: PHÂN TÍCH CỘT (OLAP)}\\[2pt]
+    \tiny -- \textbf{Động cơ}: \textbf{DuckDB / Polars} (Zero-copy)\\
+    \tiny -- Quét trực tiếp tệp \texttt{all\_chunks.parquet}\\
+    \tiny -- Phép toán: Thống kê độ dài token, tần suất\\
+    \tiny $\ \ $ từ khóa rủi ro, ma trận tương quan công ty\\
+    \tiny -- \textbf{Độ trễ truy vấn}: Cực thấp \textbf{$< \mathbf{5\ \text{ms}}$}\\
+    \tiny -- Phục vụ: Kỹ sư dữ liệu \& Nhà phân tích
+};
+
+\node[stagebox, text width=4.4cm, minimum height=3.5cm] (curated_store) at (10.0, -16.2) {
+    \textbf{\scriptsize CƠ SỞ DỮ LIỆU VÉC-TƠ (384D)}\\[2pt]
+    \tiny -- Mô hình: \texttt{all-MiniLM-L6-v2}\\
+    \tiny -- Vector đặc trưng: \textbf{384 chiều (Dense)}\\
+    \tiny -- \textbf{ChromaDB Vector Store:}\\
+    \tiny $\ \ $ SQLite nhúng + Chỉ mục Cosine HNSW\\
+    \tiny -- Siêu dữ liệu đính kèm phục vụ lọc:\\
+    \tiny $\ \ $ \texttt{ticker}, \texttt{fiscal\_year}, \texttt{chunk\_id}
+};
+
+\node[stagebox, draw=ragborder, fill=ragbg, text width=4.6cm, minimum height=3.5cm] (serving_rag) at (15.0, -16.2) {
+    \textbf{\scriptsize KÊNH 2: TRUY HỒI HYBRID RAG}\\[2pt]
+    \tiny -- \textbf{Truy hồi kép}: BM25 từ vựng + Dense 384d\\
+    \tiny -- \textbf{Hợp nhất RRF} ($k=60$): $R(d) = \sum \frac{1}{60 + r_m(d)}$\\
+    \tiny -- \textbf{Đóng gói}: \texttt{[Source: ID|CIK|Fiscal\_Year]}\\
+    \tiny -- \textbf{LLM Synthesis}: Gemini phân tích dẫn chứng\\
+    \tiny -- Phục vụ: Chuyên viên thẩm định tài chính
+};
+
+% Liên kết ngang giữa ChromaDB và Hybrid RAG (unlabelled, crisp)
+\draw[interarrow, draw=curatedborder, line width=1.1pt] (curated_store.east) -- (serving_rag.west);
+
+\begin{scope}[on background layer]
+    \node[draw=curatedborder!50, fill=curatedbg!35, rounded corners=4pt, fit=(curated_h) (serving_olap) (curated_store) (serving_rag), inner sep=3.5pt] (curated_box) {};
+\end{scope}
+
+% Downlink 3 -> 4: Từ Parquet Gold xuống 2 nhánh phục vụ
+\draw[downarrow, draw=goldborder] (gold_box.south) -- (curated_box.north);
+\node[transbadge, text=goldborder] at ($(gold_box.south)!0.5!(curated_box.north)$) {Cung Ứng Dữ Liệu Parquet Gold \& Nhúng Véc-tơ Phục Vụ Truy Vấn};
+
+% ==============================================================================
+% TẦNG 5: KHUNG ĐIỀU PHỐI & QUẢN TRỊ TOÀN CỤC (Center y = -19.9, Height = 2.0cm)
+% ==============================================================================
+\node[headercard, draw=govborder, fill=govbg, minimum width=2.1cm, text width=1.9cm, minimum height=2.0cm] (gov_h) at (1.05, -19.9) {
+    \textbf{\scriptsize QUẢN TRỊ \&}\\[1pt]
+    \textbf{\scriptsize ĐIỀU PHỐI}\\[2pt]
+    \tiny Toàn Cục\\
+    \tiny Cross-Cutting
+};
+
+\node[stagebox, draw=govborder!70, fill=govbg!40, text width=3.15cm, minimum height=2.0cm] (gov_s1) at (4.1, -19.9) {
+    \textbf{\scriptsize 1. Điều Phối Luồng DAG}\\[2pt]
+    \tiny -- Động cơ điều phối nội bộ\\
+    \tiny -- Tuần tự hóa thực thi nghiêm ngặt\\
+    \tiny -- Cách ly trạng thái các tầng
+};
+
+\node[stagebox, draw=govborder!70, fill=govbg!40, text width=3.15cm, minimum height=2.0cm] (gov_s2) at (7.9, -19.9) {
+    \textbf{\scriptsize 2. Bất Biến Idempotent}\\[2pt]
+    \tiny -- Delta Sensor \& Short-Circuit\\
+    \tiny -- Bất biến toán học: $f(f(x)) = f(x)$\\
+    \tiny -- Tái lập an toàn, không trùng
+};
+
+\node[stagebox, draw=govborder!70, fill=govbg!40, text width=3.15cm, minimum height=2.0cm] (gov_s3) at (11.7, -19.9) {
+    \textbf{\scriptsize 3. Chốt Kiểm Thử Pytest}\\[2pt]
+    \tiny -- Kiểm định tự động ở mọi ranh giới\\
+    \tiny -- Chặn đứng rò rỉ dữ liệu lỗi\\
+    \tiny -- Bảo đảm hợp đồng dữ liệu
+};
+
+\node[stagebox, draw=govborder!70, fill=govbg!40, text width=3.15cm, minimum height=2.0cm] (gov_s4) at (15.5, -19.9) {
+    \textbf{\scriptsize 4. Giám Sát \& Truy Vết}\\[2pt]
+    \tiny -- Ghi nhật ký cấu trúc (JSON Log)\\
+    \tiny -- Truy nguyên nguồn gốc (Provenance)\\
+    \tiny -- Đo đạc độ trễ từng chuyển tầng
+};
+
+\begin{scope}[on background layer]
+    \node[draw=govborder!60, fill=govbg!35, rounded corners=4pt, fit=(gov_h) (gov_s1) (gov_s4), inner sep=3.5pt] (gov_box) {};
+\end{scope}
+
+\end{tikzpicture}
+\caption{Kiến trúc tổng thể đường ống dữ liệu tài chính SEC EDGAR theo mô hình Medallion Lakehouse: Phân định chi tiết các tầng chuyển hóa, chốt kiểm soát chất lượng, cơ chế phòng vệ biên và hai kênh phục vụ truy vấn song song.}
+\label{fig:master_pipeline_architecture}
+\label{fig:medallion_flow}
+\end{figure*}
+\clearpage
+
+\subsection{Hợp đồng dữ liệu chi tiết giữa các tầng}
+Mỗi bước chuyển tầng được xác lập thông qua một hợp đồng dữ liệu tường minh (\textit{explicit data contract}) nhằm loại bỏ lỗi ngầm, xác định dữ liệu tiếp nhận, xử lý và định dạng xuất bản:
+
+\begin{table}[htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\caption{Đặc tả hợp đồng dữ liệu giữa các tầng trong kiến trúc Medallion}
+\label{tab:data_contracts}
+\begin{tabularx}{\textwidth}{l p{2.1cm} X >{\raggedright\arraybackslash}p{3.2cm} l}
+\toprule
+\textbf{Tầng Lưu Trữ} & \textbf{Dữ Liệu Nhận} & \textbf{Quy Trình Xử Lý} & \textbf{Dữ Liệu Xuất Xưởng} & \textbf{Định Dạng} \\
+\midrule
+\textbf{01\_raw (Bronze)} & HTTP từ SEC & Bảo toàn tính nguyên trạng, đối chiếu accession & \path{all_companies.json}, \path{{T}/*.htm} & JSON / HTML \\
+\textbf{02\_staging (Silver)} & JSON \& HTML thô & Chuẩn hóa CIK 10 số, khử trùng ticker, lọc thẻ HTML & \path{companies_clean.parquet}, \path{*.md} & Parquet / MD \\
+\textbf{03\_primary (Gold)} & Markdown sạch & Phân đoạn tokenizer-aware ($\le$240t), tạo chunk\_id & \path{all_chunks.parquet} (925 rows) & Parquet (Snappy) \\
+\textbf{04\_curated (Serving)} & Parquet Gold & Tạo vector 384 chiều (MiniLM-L6), lập chỉ mục Cosine & \path{vector_db/} (ChromaDB collection) & SQLite Binary \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Quy trình thực thi hợp đồng dữ liệu qua từng tầng phản ánh rõ nguyên lý tinh chế:
+\begin{itemize}
+    \item \textbf{Tầng Đồng (Bronze)}: Nguyên tắc bất biến là bảo toàn nguồn gốc dữ liệu (\textit{data provenance}) tuyệt đối. Hệ thống lưu trữ nguyên vẹn dữ liệu nhị phân nhận từ máy chủ SEC, không can thiệp hay sửa đổi cấu trúc gốc.
+    \item \textbf{Tầng Bạc (Silver)}: Dữ liệu chuyển dịch từ phi cấu trúc sang bán cấu trúc và có cấu trúc. Áp dụng định dạng Apache Parquet nén Snappy để triệt tiêu các khoảng trống dư thừa và cố định kiểu dữ liệu.
+    \item \textbf{Tầng Vàng (Gold)}: Cấu trúc phân đoạn văn bản được khóa chặt bằng các ràng buộc toán học về độ dài token, bảo đảm không có bản ghi nào vi phạm trần giới hạn ngữ cảnh của mô hình tính toán hạ nguồn.
+    \item \textbf{Tầng Phục Vụ (Curated)}: Giao diện phục vụ truy vấn có độ trễ thấp, kết hợp chỉ mục véc-tơ và các trường siêu dữ liệu kiểm toán để đáp ứng các yêu cầu phân tích thời gian thực.
+\end{itemize}

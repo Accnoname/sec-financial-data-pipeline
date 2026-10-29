@@ -1,0 +1,35 @@
+\section{Quy Trình Thu Thập Dữ Liệu (Data Ingestion)}
+
+\subsection{Các điểm cuối dịch vụ SEC EDGAR và quy chuẩn kết nối}
+Hệ thống SEC EDGAR đóng vai trò là kho lưu trữ hồ sơ tài chính pháp lý của chính phủ Hoa Kỳ. Quá trình thu thập dữ liệu tự động tại Tầng Đồng giao tiếp trực tiếp với ba điểm cuối dịch vụ chính thức của SEC:
+\begin{itemize}
+    \item \textbf{Điểm cuối danh bạ công ty} (\url{https://www.sec.gov/files/company_tickers_exchange.json}): Cung cấp danh mục mã cổ phiếu, tên doanh nghiệp, sàn giao dịch và mã CIK của hơn 10.400 thực thể niêm yết.
+    \item \textbf{Điểm cuối siêu dữ liệu hồ sơ nộp} (\path{https://data.sec.gov/submissions/CIK{padded_cik}.json}): Tiếp nhận mã CIK 10 chữ số để trả về lịch sử nộp gần nhất, loại biểu mẫu và mã kiểm soát \texttt{accessionNumber}.
+    \item \textbf{Điểm cuối tệp tin nguyên bản} (\path{https://www.sec.gov/Archives/edgar/data/{cik}/{acc}/{doc}}): Cho phép tải về toàn văn tệp HTML gốc của báo cáo thường niên Form 10-K.
+\end{itemize}
+
+Nhằm tuân thủ Chính sách Truy cập Công bằng của SEC~\cite{sec2024edgar}, mọi yêu cầu HTTP bắt buộc đính kèm tiêu đề \texttt{User-Agent}: \texttt{StockMarketRAGDataEngineer student@university.edu.vn}. SEC áp trần tốc độ 10 yêu cầu/giây. Đường ống chèn \texttt{time.sleep(0.2)} giữa các lần gọi ($\sim$5 req/s), kèm thời gian chờ (timeout) 15 giây cho siêu dữ liệu và 30 giây cho tệp HTML lớn.
+
+\subsection{Cơ chế phục hồi lỗi mạng và thuật toán thử lại hàm mũ}
+Hạ tầng mạng công cộng và máy chủ SEC thường xuyên đối mặt với các đợt tăng tải đột biến, dẫn đến nguy cơ xuất hiện các mã phản hồi lỗi HTTP 429 (Too Many Requests) hoặc các lỗi máy chủ HTTP 5xx. Đường ống thiết kế cơ chế phòng vệ hai lớp chặt chẽ:
+\begin{itemize}
+    \item \textbf{Lớp 1 -- Dự phòng cục bộ (Local Fallback)}: Tại cấp độ hàm nghiệp vụ \path{get_latest_10k_metadata}, ngoại lệ mạng được bắt để quét thư mục cục bộ và tận dụng tệp HTML sẵn có từ phiên trước.
+    \item \textbf{Lớp 2 -- Thử lại với bước lùi hàm mũ và dao động ngẫu nhiên (Exponential Backoff with Full Jitter)}: Tại cấp độ Task Runner, tác vụ được cấu hình \texttt{max\_retries=3} và trễ cơ sở $t_{\text{base}}=3,0\text{s}$. Thời gian trễ lần thử thứ $i$ tuân theo công thức:
+    \begin{equation}
+        t_{\text{delay}} = \text{Uniform}\left(0, \, t_{\text{base}} \times \alpha^i\right)
+    \end{equation}
+    với hệ số tăng trưởng $\alpha = 2,0$, triệt tiêu hiện tượng nghẽn mạng dồn dập (thundering herd problem) lên hạ tầng SEC.
+\end{itemize}
+
+\subsection{Cảm biến phát hiện thay đổi và khả năng bỏ qua tệp sẵn có}
+Đường ống hiện thực hóa mẫu hình Cảm biến chênh lệch (Delta Sensor Pattern): gửi yêu cầu nhẹ tới API siêu dữ liệu để đối chiếu trường \texttt{accessionNumber} với tệp \texttt{metadata.json} Tầng Đồng. Nếu trùng khớp và tệp đã tồn tại, đường ống đánh dấu \texttt{SKIPPED} và đặt \texttt{has\_changes = False}, ngắt ngắn các tác vụ sau chỉ trong 3,09 giây.
+
+\subsection{Quy tắc lựa chọn bản Form 10-K theo niên độ tài chính}
+Báo cáo Form 10-K được ban hành một lần mỗi năm tài chính, nhưng thời điểm kết thúc niên độ (Fiscal Year End) giữa các tập đoàn có sự khác biệt rõ rệt:
+\begin{itemize}
+    \item \textbf{Apple (AAPL)}: Niên độ kết thúc vào thứ Bảy cuối tháng 9; bản báo cáo mới nhất là niên độ 2025 (\path{aapl-20250927.htm}), nộp ngày 31/10/2025.
+    \item \textbf{Microsoft (MSFT)}: Niên độ kết thúc ngày 30/06 (đi trước lịch dương); báo cáo nộp ngày 29/07/2026 mang niên độ 2026 (\path{msft-20260630.htm}).
+    \item \textbf{Nvidia (NVDA)}: Niên độ kết thúc vào Chủ nhật cuối tháng 1; bản nộp ngày 25/02/2026 mang niên độ 2026 (\path{nvda-20260125.htm}).
+    \item \textbf{Amazon, Alphabet, Meta, Tesla}: Niên độ kết thúc vào ngày 31/12; các báo cáo nộp đầu năm 2026 đều thuộc niên độ tài chính 2025.
+\end{itemize}
+Giải thuật thu thập của đường ống duyệt tuần tự danh sách hồ sơ nộp từ mới nhất đến cũ nhất và dừng lại chính xác tại bản ghi đầu tiên có trường biểu mẫu bằng \texttt{10-K}, bảo đảm tính cập nhật pháp lý cao nhất cho từng doanh nghiệp.

@@ -1,4 +1,7 @@
 version: '3.8'
+# NOTE: Kiến trúc chuẩn của dự án chạy thuần Python trên hệ thống tệp tin cục bộ (Local Snappy Parquet + ChromaDB nhúng).
+# File docker-compose.yml này là khuôn mẫu tham chiếu hạ tầng mở rộng (Enterprise Scale-Out Blueprint)
+# cho trường hợp chuyển đổi sang kho dữ liệu phân tán (PostgreSQL DW, MinIO Object Storage, Qdrant Vector Cluster).
 
 services:
   # Metadata / Data Warehouse Local

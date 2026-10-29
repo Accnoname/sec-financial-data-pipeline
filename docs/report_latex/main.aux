@@ -1,0 +1,95 @@
+\relax 
+\providecommand \babel@aux [2]{\global \let \babel@toc \@gobbletwo }
+\@nameuse{bbl@beforestart}
+\catcode `"\active 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\babel@aux{vietnamese}{}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Bài Toán và Phạm Vi Kỹ Thuật}{1}{section.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.1}Bối cảnh kỹ thuật và bài toán đặt ra}{1}{subsection.1.1}\protected@file@percent }
+\citation{armbrust2021lakehouse}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.2}Đối tượng thụ hưởng và định dạng đầu ra}{2}{subsection.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.3}Phạm vi giới hạn và các mục tiêu không thực hiện}{2}{subsection.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}Luồng Dữ Liệu và Hợp Đồng Từng Tầng}{2}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Mô hình kiến trúc hồ chứa dữ liệu Medallion}{2}{subsection.2.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Kiến trúc tổng thể đường ống dữ liệu tài chính SEC EDGAR theo mô hình Medallion Lakehouse: Phân định chi tiết các tầng chuyển hóa, chốt kiểm soát chất lượng, cơ chế phòng vệ biên và hai kênh phục vụ truy vấn song song.}}{3}{figure.1}\protected@file@percent }
+\newlabel{fig:master_pipeline_architecture}{{1}{3}{Kiến trúc tổng thể đường ống dữ liệu tài chính SEC EDGAR theo mô hình Medallion Lakehouse: Phân định chi tiết các tầng chuyển hóa, chốt kiểm soát chất lượng, cơ chế phòng vệ biên và hai kênh phục vụ truy vấn song song}{figure.1}{}}
+\newlabel{fig:medallion_flow}{{1}{3}{Kiến trúc tổng thể đường ống dữ liệu tài chính SEC EDGAR theo mô hình Medallion Lakehouse: Phân định chi tiết các tầng chuyển hóa, chốt kiểm soát chất lượng, cơ chế phòng vệ biên và hai kênh phục vụ truy vấn song song}{figure.1}{}}
+\citation{sec2024edgar}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Hợp đồng dữ liệu chi tiết giữa các tầng}{4}{subsection.2.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Đặc tả hợp đồng dữ liệu giữa các tầng trong kiến trúc Medallion}}{4}{table.1}\protected@file@percent }
+\newlabel{tab:data_contracts}{{1}{4}{Đặc tả hợp đồng dữ liệu giữa các tầng trong kiến trúc Medallion}{table.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Quy Trình Thu Thập Dữ Liệu (Data Ingestion)}{4}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Các điểm cuối dịch vụ SEC EDGAR và quy chuẩn kết nối}{4}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Cơ chế phục hồi lỗi mạng và thuật toán thử lại hàm mũ}{4}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Cảm biến phát hiện thay đổi và khả năng bỏ qua tệp sẵn có}{5}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Quy tắc lựa chọn bản Form 10-K theo niên độ tài chính}{5}{subsection.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Quy Trình Chuẩn Hóa và Bóc Tách (Transformation)}{5}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Chuẩn hóa định danh CIK và khử trùng lặp danh mục doanh nghiệp}{5}{subsection.4.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Quy trình ba giai đoạn bóc tách nội dung Item 1A từ tài liệu HTML thô.}}{6}{figure.2}\protected@file@percent }
+\newlabel{fig:extraction_flow}{{2}{6}{Quy trình ba giai đoạn bóc tách nội dung Item 1A từ tài liệu HTML thô}{figure.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Kỹ thuật lai DOM và Regex bóc tách ranh giới Item 1A}{6}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Xử lý ngoại lệ HTML dị thường và bẫy mục lục}{6}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Thiết Kế Lưu Trữ và Tối Ưu Hóa Dữ Liệu}{6}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Cấu trúc phân cấp cây thư mục hồ chứa dữ liệu}{6}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Cấu trúc thực thể và lược đồ chi tiết của Tầng Vàng (Gold Layer)}{7}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Phân định ranh giới: Tinh lọc ngữ nghĩa và Nén nhị phân Snappy}{7}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Luồng truy xuất dữ liệu sau khi lưu trữ tại Tầng Vàng}{7}{subsection.5.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Thống kê định lượng dung lượng lưu trữ thực tế}{8}{subsection.5.5}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Thống kê số lượng tệp tin và dung lượng lưu trữ thực tế trên đĩa}}{8}{table.2}\protected@file@percent }
+\newlabel{tab:storage_metrics}{{2}{8}{Thống kê số lượng tệp tin và dung lượng lưu trữ thực tế trên đĩa}{table.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Bộ Điều Phối Tác Vụ và Quản Trị Cấu Hình}{8}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Cơ chế điều khiển luồng công việc qua run.py và PipelineDAG}{8}{subsection.6.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Đồ thị DAG thực thi tuần tự các tác vụ kèm chốt kiểm soát chất lượng (Quality Gates).}}{8}{figure.3}\protected@file@percent }
+\newlabel{fig:dag_pipeline}{{3}{8}{Đồ thị DAG thực thi tuần tự các tác vụ kèm chốt kiểm soát chất lượng (Quality Gates)}{figure.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Chiến lược quản trị cấu hình và nhật ký kiểm toán có cấu trúc}{8}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Đối sánh chuyên sâu với nền tảng Apache Airflow}{9}{subsection.6.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces So sánh giữa bộ điều phối PipelineDAG nội bộ và Apache Airflow}}{9}{table.3}\protected@file@percent }
+\newlabel{tab:airflow_comparison}{{3}{9}{So sánh giữa bộ điều phối PipelineDAG nội bộ và Apache Airflow}{table.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Tính Bất Biến (Idempotency) và Khả Năng Tái Lập}{9}{section.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Nguyên lý bất biến và cơ chế ghi đè có kiểm soát}{9}{subsection.7.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}Định danh phân đoạn tất định và kiểm toán nguồn gốc}{9}{subsection.7.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Sơ đồ phân rã cấu trúc định danh phân đoạn tất định (Deterministic Chunk ID Schema).}}{10}{figure.4}\protected@file@percent }
+\newlabel{fig:chunk_id_schema}{{4}{10}{Sơ đồ phân rã cấu trúc định danh phân đoạn tất định (Deterministic Chunk ID Schema)}{figure.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3}Tính cô lập bước và quy trình tái lập hệ thống}{10}{subsection.7.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8}Quản Trị Chất Lượng Dữ Liệu và Bộ Kiểm Thử Tự Động}{10}{section.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.1}Triết lý kiểm thử theo hướng hợp đồng dữ liệu (Data Contract Testing)}{10}{subsection.8.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.2}Phân tích chuyên sâu 8 ca kiểm thử tích hợp đường ống}{10}{subsection.8.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.3}Hợp đồng dữ liệu ràng buộc độ dài véc-tơ nhúng}{10}{subsection.8.3}\protected@file@percent }
+\citation{reimers2019sentence}
+\citation{robertson2009probabilistic}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Phân tích phạm vi bảo đảm và giới hạn của 8 ca kiểm thử tích hợp trong test\_pipeline.py}}{11}{table.4}\protected@file@percent }
+\newlabel{tab:pytest_analysis}{{4}{11}{Phân tích phạm vi bảo đảm và giới hạn của 8 ca kiểm thử tích hợp trong test\_pipeline.py}{table.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {9}Tầng Phục Vụ (Serving Layer)}{11}{section.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.1}Cơ chế nạp và lập chỉ mục tại Tầng Phục Vụ}{11}{subsection.9.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Sơ đồ luồng truy xuất dữ liệu hai kênh: Kênh phân tích định lượng trực tiếp từ Tầng Vàng và Kênh tìm kiếm kết hợp Hybrid RAG phục vụ người dùng.}}{11}{figure.5}\protected@file@percent }
+\newlabel{fig:retrieval_flow}{{5}{11}{Sơ đồ luồng truy xuất dữ liệu hai kênh: Kênh phân tích định lượng trực tiếp từ Tầng Vàng và Kênh tìm kiếm kết hợp Hybrid RAG phục vụ người dùng}{figure.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.2}Khai thác dữ liệu qua động cơ tìm kiếm kết hợp Hybrid Search}{11}{subsection.9.2}\protected@file@percent }
+\citation{cormack2009reciprocal}
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.3}Cung cấp ngữ cảnh kiểm toán cho mô hình ngôn ngữ lớn}{12}{subsection.9.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {10}Ca Nghiên Cứu: Khắc Phục Lỗi Cắt Ngắn Ngữ Cảnh (Truncation Defect)}{12}{section.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.1}Bản chất của lỗi suy giảm chất lượng dữ liệu âm thầm}{12}{subsection.10.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.2}Thiết kế thực nghiệm đo lường và phát hiện điểm mù}{12}{subsection.10.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.3}Giải pháp kỹ thuật và bằng chứng thực nghiệm phục hồi dữ liệu}{12}{subsection.10.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Bằng chứng thực nghiệm đối đầu trước và sau khi khắc phục lỗi cắt ngắn ngữ cảnh}}{13}{table.5}\protected@file@percent }
+\newlabel{tab:truncation_recovery}{{5}{13}{Bằng chứng thực nghiệm đối đầu trước và sau khi khắc phục lỗi cắt ngắn ngữ cảnh}{table.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {11}Vận Hành Thực Tế và Khả Năng Mở Rộng}{13}{section.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {11.1}Thời gian thực thi từng bước trong môi trường vận hành}{13}{subsection.11.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Đo lường thời gian thực thi chi tiết của từng bước trong đường ống}}{13}{table.6}\protected@file@percent }
+\newlabel{tab:execution_times}{{6}{13}{Đo lường thời gian thực thi chi tiết của từng bước trong đường ống}{table.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {11.2}Phân tích các điểm nghẽn kiến trúc khi dữ liệu tăng gấp 100 lần}{13}{subsection.11.2}\protected@file@percent }
+\bibstyle{IEEEtran}
+\bibdata{ref}
+\bibcite{armbrust2021lakehouse}{1}
+\bibcite{sec2024edgar}{2}
+\bibcite{reimers2019sentence}{3}
+\@writefile{toc}{\contentsline {section}{\numberline {12}Giới Hạn Kỹ Thuật và Hướng Phát Triển}{14}{section.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {12.1}Các hạn chế cố hữu trong phiên bản hiện tại}{14}{subsection.12.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {12.2}Lộ trình nâng cấp và mở rộng kiến trúc tương lai}{14}{subsection.12.2}\protected@file@percent }
+\bibcite{robertson2009probabilistic}{4}
+\bibcite{cormack2009reciprocal}{5}
+\@writefile{toc}{\contentsline {section}{Phụ Lục: Bảng Chú Giải Thuật Ngữ Kỹ Thuật Chuyên Ngành}{16}{subsection.12.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Bảng chú giải các thuật ngữ kỹ thuật chuyên ngành cốt lõi trong đường ống}}{16}{table.7}\protected@file@percent }
+\newlabel{tab:glossary_technical_terms}{{7}{16}{Bảng chú giải các thuật ngữ kỹ thuật chuyên ngành cốt lõi trong đường ống}{table.7}{}}
+\gdef \@abspage@last{16}

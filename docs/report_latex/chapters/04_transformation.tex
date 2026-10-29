@@ -1,0 +1,69 @@
+\section{Quy Trình Chuẩn Hóa và Bóc Tách (Transformation)}
+
+\subsection{Chuẩn hóa định danh CIK và khử trùng lặp danh mục doanh nghiệp}
+Tệp dữ liệu thô \texttt{all\_companies.json} từ SEC chứa hơn 10.400 bản ghi nhưng tồn tại nhiều vấn đề về chất lượng dữ liệu: mã CIK xuất hiện dưới dạng số nguyên thiếu các số 0 ở đầu (ví dụ Apple có CIK là số nguyên \texttt{320193}), hoặc dạng chuỗi có phần thập phân giả định do Pandas tự động ép kiểu sang \texttt{float64} khi gặp giá trị trống (\texttt{"320193.0"}), mã cổ phiếu chứa khoảng trắng thừa hoặc chữ thường (\texttt{" aapl "}), và các mã cổ phiếu trùng lặp khi niêm yết nhiều lớp cổ phần.
+
+Tại Bước 2 của đường ống, quy trình xử lý thực hiện các thao tác làm sạch có hệ thống theo bốn giai đoạn:
+\begin{enumerate}
+    \item \textbf{Loại bỏ bản ghi khuyết thiếu}: Loại bỏ các dòng khuyết thiếu thuộc tính định danh chính qua phương thức \texttt{dropna(subset=['cik', 'ticker', 'name'])}.
+    \item \textbf{Chuẩn hóa chuỗi ký tự}: Chuyển mã cổ phiếu về dạng in hoa không khoảng trắng thừa (\texttt{upper().strip()}), đồng thời làm sạch tên công ty và sàn giao dịch.
+    \item \textbf{Chuẩn hóa định danh pháp lý CIK 10 chữ số}: Phòng chống lỗi ép kiểu số thực (ví dụ \texttt{"320193.0"}). Thuật toán tách chuỗi theo dấu chấm \texttt{.str.split('.').str[0]} để loại bỏ phần thập phân giả định, sau đó áp dụng phép đệm chuỗi \texttt{zfill(10)}:
+    \begin{equation}
+        \text{CIK}_{\text{standard}} = \text{str}(\text{raw\_cik}).\text{split}('.')[0].\text{zfill}(10)
+    \end{equation}
+    Nhờ đó, CIK Apple \texttt{320193} trở thành \texttt{"0000320193"}, Microsoft \texttt{789019} thành \texttt{"0000789019"}, và Nvidia \texttt{1045810} thành \texttt{"0001045810"}, đáp ứng chuẩn 10 chữ số của SEC EDGAR.
+    \item \textbf{Khử trùng lặp và xác lập nhóm mục tiêu}: Khử trùng lặp qua \texttt{drop\_duplicates(subset=['ticker'])}, bổ sung cờ boolean \texttt{is\_major} định vị 7 tập đoàn công nghệ mục tiêu, thu gọn lược đồ về 5 cột (\texttt{cik}, \texttt{ticker}, \texttt{name}, \texttt{exchange}, \texttt{is\_major}) và xuất bản tệp tin \path{companies_clean.parquet} nén Snappy tại Tầng Bạc.
+\end{enumerate}
+
+\subsection{Kỹ thuật lai DOM và Regex bóc tách ranh giới Item 1A}
+Bóc tách phần Thuyết minh rủi ro (Item 1A) từ tệp HTML Form 10-K là thử thách lớn do sự đa dạng về trình bày. Đường ống kết hợp phân tích cú pháp DOM và máy trạng thái biểu thức chính quy (Regex):
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        node distance=0.35cm and 0.45cm,
+        stepbox/.style={rectangle, draw=blue!70!black, fill=blue!5, thick, rounded corners=2pt, text width=3.4cm, minimum height=0.75cm, align=center, font=\tiny},
+        arrow/.style={-{Stealth[scale=0.8]}, thick, draw=blue!70!black}
+    ]
+        \node[stepbox] (step1) {\textbf{1. Phân Tích DOM}\\Xóa \texttt{<script>}, \texttt{<style>}, \texttt{<ix:header>}};
+        \node[stepbox, right=of step1] (step2) {\textbf{2. Khớp Mẫu Regex}\\Nhận diện \texttt{ITEM\_1A}, ranh giới Item 1B/2};
+        \node[stepbox, right=of step2] (step3) {\textbf{3. Vượt Bẫy Mục Lục}\\Lọc ngưỡng \texttt{len(text) > 5000}, xuất Markdown};
+        
+        \draw[arrow] (step1) -- (step2);
+        \draw[arrow] (step2) -- (step3);
+    \end{tikzpicture}
+    \caption{Quy trình ba giai đoạn bóc tách nội dung Item 1A từ tài liệu HTML thô.}
+    \label{fig:extraction_flow}
+\end{figure}
+
+Giai đoạn đầu tiên sử dụng thư viện \texttt{BeautifulSoup} với trình phân tích \texttt{lxml} để duyệt cây DOM. Nhằm loại bỏ các thành phần gây nhiễu, thuật toán gọi phương thức \texttt{decompose()} trên toàn bộ các khối thẻ kịch bản \texttt{<script>}, định dạng trang trí \texttt{<style>} và các thẻ siêu dữ liệu tài chính \texttt{<ix:header>} của chuẩn báo cáo điện tử iXBRL. Chuỗi văn bản thuần sau đó được chiết xuất thông qua dấu phân cách dòng mới \texttt{separator="$\backslash$n"}, kết hợp khử khoảng trắng đầu cuối trên từng dòng.
+
+Giai đoạn thứ hai định vị ranh giới bắt đầu của Item 1A thông qua mẫu biểu thức chính quy \texttt{ITEM\_1A\_PATTERN}:
+\begin{center}
+\scriptsize\texttt{r'(?:\^{}|$\backslash$n)ITEM[$\backslash$s$\backslash$xa0]*1A$\backslash$.?[$\backslash$s$\backslash$xa0$\backslash$n]*(?:RISK|RIS[$\backslash$s$\backslash$xa0$\backslash$n]*K)?[$\backslash$s$\backslash$xa0$\backslash$n]*FACTORS'}
+\end{center}
+và ranh giới kết thúc nhận diện qua mẫu \texttt{NEXT\_ITEM\_PATTERN}: \texttt{r'$\backslash$nITEM[$\backslash$s$\backslash$xa0]*(?:1B|1C|2)$\backslash$.?'}.
+
+\subsection{Xử lý ngoại lệ HTML dị thường và bẫy mục lục}
+Trong quá trình bóc tách thực tế từ tệp HTML Form 10-K của SEC, đường ống đối mặt và xử lý triệt để ba dạng dị thường cấu trúc nghiêm trọng:
+
+\begin{itemize}
+    \item \textbf{Bẫy bảng mục lục (Table of Contents Trap)}:
+    \begin{itemize}
+        \item \textit{Cơ chế lỗi}: Tiêu đề ``Item 1A. Risk Factors'' luôn xuất hiện lần đầu tiên ở các trang đầu thuộc phần mục lục (chứa chuỗi dạng \texttt{Item 1A. Risk Factors ....... Trang 15}). Nếu dùng Regex tìm khớp đầu tiên (\texttt{re.search}), hệ thống sẽ trích xuất nhầm bảng mục lục chỉ dài 200--400 ký tự rác, gây lỗi âm thầm (\textit{silent failure}) làm mất 100\% nội dung rủi ro cốt lõi.
+        \item \textit{Giải pháp}: Thuật toán duyệt qua toàn bộ các vị trí khớp và áp dụng bộ lọc ngưỡng độ dài tối thiểu 5.000 ký tự (\texttt{len(candidate) > 5000}) để xác nhận phần thân thuyết minh thực thụ.
+    \end{itemize}
+    
+    \item \textbf{Ngắt dòng và thẻ lồng trong tiêu đề (Inline Tag Split -- Microsoft MSFT)}:
+    \begin{itemize}
+        \item \textit{Cơ chế lỗi}: Trong tệp \path{msft-20260630.htm}, tiêu đề Item 1A bị bẻ gãy bởi các thẻ lồng nhau (như \texttt{<span>RIS</span><br>} và \texttt{<span>K FACTORS</span>}) hoặc thực thể HTML \texttt{\&\#160;} (\texttt{$\backslash$xa0}). Biểu thức tiêu chuẩn (\texttt{r'ITEM 1A\. RISK FACTORS'}) trả về chuỗi rỗng (\texttt{""}), làm mất sạch dữ liệu của tập đoàn 3.000 tỷ USD.
+        \item \textit{Giải pháp}: Mở rộng biểu thức Regex với cụm điều kiện phòng vệ \texttt{(?:RISK|RIS[$\backslash$s$\backslash$xa0$\backslash$n]*K)?} và hỗ trợ ký tự \texttt{$\backslash$xa0}, khôi phục 100\% khả năng nhận diện tiêu đề cho Microsoft.
+    \end{itemize}
+    
+    \item \textbf{Rác siêu văn bản từ chuẩn báo cáo iXBRL và cơ chế phòng vệ}:
+    \begin{itemize}
+        \item \textit{Cơ chế lỗi}: Báo cáo SEC hiện đại chứa hàng nghìn thẻ tài chính \texttt{<ix:nonNumeric>}, \texttt{<ix:header>}. Nếu không bóc tách đúng, các chuỗi siêu dữ liệu này làm loãng ngữ nghĩa câu và gây nổ số lượng token.
+        \item \textit{Giải pháp bóc tách sạch}: Trình phân tích \texttt{lxml} gọi \texttt{decompose()} trên toàn bộ thẻ \texttt{<script>}, \texttt{<style>} và \texttt{<ix:header>} trước khi trích xuất văn bản thuần.
+        \item \textit{Bản chất cơ chế phòng vệ (Defensive Fallback)}: Nếu gặp cấu trúc HTML dị thường khiến Regex không tìm thấy ranh giới Item 1A vượt 5.000 ký tự, hàm kích hoạt cơ chế suy thoái mềm (\textit{graceful degradation}): tự động cắt 50.000 ký tự đầu tiên của Part I (vùng 10--15 trang A4 đầu, nơi Item 1A thường tọa lạc) thay vì văng ngoại lệ làm sập toàn bộ đợt xử lý hàng loạt. Hệ thống đồng thời phát cảnh báo \texttt{WARNING} vào tệp nhật ký để kỹ sư dữ liệu can thiệp bổ sung quy tắc Regex mới. Trong thực tế vận hành, 100\% của 7 tập đoàn mục tiêu đều khớp thành công qua Regex mở rộng mà không cần kích hoạt chế độ dự phòng này.
+    \end{itemize}
+\end{itemize}

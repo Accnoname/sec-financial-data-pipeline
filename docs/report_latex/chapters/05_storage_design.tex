@@ -1,0 +1,62 @@
+\section{Thiết Kế Lưu Trữ và Tối Ưu Hóa Dữ Liệu}
+
+\subsection{Cấu trúc phân cấp cây thư mục hồ chứa dữ liệu}
+Hệ thống tổ chức dữ liệu hoàn toàn trên hệ thống tệp tin cục bộ qua 4 tầng phân cấp rõ rệt:
+\begin{itemize}
+    \item \textbf{Tầng Đồng (\path{data/bronze/})}: Chứa danh bạ gốc \path{all_companies.json} (1,18 MB), các tệp báo cáo Form 10-K gốc \path{sec_filings/{TICKER}/*.htm} (20,9 MB) và tệp \path{metadata.json}.
+    \item \textbf{Tầng Bạc (\path{data/silver/})}: Chứa danh bạ công ty đã làm sạch \path{companies_clean.parquet} (287 KB Snappy) và các tệp văn bản Item 1A sạch \path{*_risk_factors.md} (993 KB).
+    \item \textbf{Tầng Vàng (\path{data/gold/})}: Chứa bảng phân đoạn tổng hợp \path{all_chunks.parquet} (660 KB Snappy, đúng 925 hàng dữ liệu) và các bản sao tệp JSON phục vụ kiểm toán chéo.
+    \item \textbf{Tầng Phục Vụ (\path{data/curated/})}: Chứa thư mục cơ sở dữ liệu véc-tơ \path{vector_db/} của ChromaDB (11,71 MB).
+\end{itemize}
+
+\subsection{Cấu trúc thực thể và lược đồ chi tiết của Tầng Vàng (Gold Layer)}
+Tầng Vàng là kho lưu trữ trung tâm phục vụ toàn bộ các nhu cầu phân tích và truy hồi hạ nguồn. Bảng dữ liệu \path{all_chunks.parquet} được thiết kế theo lược đồ 8 cột được kiểm soát kiểu dữ liệu nghiêm ngặt:
+\begin{itemize}
+    \item \texttt{chunk\_id} (string): Khóa chính tất định theo mẫu \texttt{TICKER\_YEAR\_RF\_INDEX} (ví dụ: \texttt{NVDA\_2026\_RF\_0001}), bảo đảm tính bất biến khi chạy lại.
+    \item \texttt{ticker} (string): Mã cổ phiếu niêm yết của doanh nghiệp (ví dụ: \texttt{AAPL}, \texttt{MSFT}, \texttt{NVDA}).
+    \item \texttt{year} (int64): Niên độ tài chính của báo cáo Form 10-K (ví dụ: 2025 hoặc 2026).
+    \item \texttt{section} (string): Tên phân hệ nghiệp vụ, cố định là chuỗi \texttt{"Item 1A. Risk Factors"}.
+    \item \texttt{chunk\_index} (int64): Thứ tự phân đoạn trong tập tài liệu của công ty (chỉ số chạy từ 1 đến \texttt{total\_chunks}).
+    \item \texttt{total\_chunks} (int64): Tổng số lượng phân đoạn văn bản của công ty đó (ví dụ: NVDA có 32 đoạn, AAPL có 25 đoạn, TSLA có 76 đoạn).
+    \item \texttt{word\_count} (int64): Số lượng từ thực tế trong phân đoạn (trung bình từ 120 đến 160 từ tiếng Anh).
+    \item \texttt{text} (string): Nội dung văn bản phân đoạn hoàn chỉnh, đã được xử lý ngắt theo ranh giới câu, độ dài token đo bằng bộ tách từ WordPiece của \texttt{all-MiniLM-L6-v2} luôn thỏa mãn $\le 240$ tokens.
+\end{itemize}
+
+\subsection{Phân định ranh giới: Tinh lọc ngữ nghĩa và Nén nhị phân Snappy}
+Để tránh gây hiểu lầm trong tư duy hệ thống giữa hai khái niệm ``giảm dung lượng'', đường ống phân định rạch ròi hai cơ chế kỹ thuật hoàn toàn khác nhau:
+\begin{itemize}
+    \item \textbf{Tinh lọc loại bỏ rác ngữ nghĩa (Semantic Data Filtering) từ Bronze sang Silver}: Từ 22,51 MB tệp HTML thô ban đầu, quy trình bóc tách loại bỏ hàng triệu byte thẻ đánh dấu HTML (\texttt{<html>}, \texttt{<div>}, \texttt{<style>}, \texttt{<script>}) và rác siêu dữ liệu iXBRL, đồng thời cắt bỏ toàn bộ các mục không liên quan (Item 1, Item 2 đến Item 15), chỉ giữ lại duy nhất phần văn bản thuần của Item 1A. Mức giảm 94,3\% dung lượng ở bước này là do \textbf{chắt lọc loại bỏ dữ liệu thừa về mặt nghiệp vụ}, không phải do thuật toán nén nhị phân.
+    \item \textbf{Nén nhị phân không mất mát (Lossless Binary Compression) tại Tầng Gold}: Khi lưu trữ 925 phân đoạn văn bản vào tệp \path{all_chunks.parquet}, hệ thống áp dụng thuật toán nén nhị phân \textbf{Snappy} kết hợp mã hóa từ điển (Dictionary Encoding) của Apache Parquet. Đây là kỹ thuật nén cấp độ byte trên đĩa: dữ liệu được bảo toàn 100\% trọn vẹn từng ký tự. Khi được nạp vào bộ nhớ RAM, thư viện PyArrow giải nén tức thời với thông lượng hàng trăm MB/giây mà không suy hao bất kỳ thông tin nào.
+\end{itemize}
+
+\subsection{Luồng truy xuất dữ liệu sau khi lưu trữ tại Tầng Vàng}
+Dữ liệu sau khi nén và lưu trữ tại Tầng Vàng không phải là điểm dừng cuối cùng mà được phục vụ qua hai kênh truy xuất độc lập:
+\begin{itemize}
+    \item \textbf{Kênh 1 -- Truy vấn phân tích định lượng (Analytical Query Flow)}: Các kỹ sư dữ liệu hoặc chuyên viên tài chính sử dụng DuckDB hoặc Polars truy vấn trực tiếp vào tệp \path{all_chunks.parquet}. Nhờ tính năng chiếu cột (\textit{Column Projection}) của Parquet, bộ máy truy vấn chỉ đọc và giải nén các cột số liệu cần thiết (như \texttt{ticker}, \texttt{word\_count}, \texttt{total\_chunks}) mà hoàn toàn bỏ qua cột \texttt{text} dài, giúp tiết kiệm hơn 80\% băng thông đọc đĩa I/O và hoàn tất truy vấn tổng hợp trong dưới 5 mili-giây.
+    \item \textbf{Kênh 2 -- Truy hồi phục vụ AI và Tìm kiếm kết hợp (AI / RAG Serving Flow)}: Tệp \path{all_chunks.parquet} đóng vai trò là nguồn dữ liệu chuẩn mực duy nhất (Single Source of Truth) để cấp phát cho Tầng Phục Vụ. Cột \texttt{text} được giải nén để mô hình \texttt{all-MiniLM-L6-v2} nhúng thành các vector 384 chiều và nạp vào ChromaDB. Khi người dùng gửi câu hỏi truy vấn, dữ liệu Tầng Vàng được truy xuất song song qua hai nhánh: nhánh véc-tơ ngữ nghĩa trong ChromaDB và nhánh từ vựng chính xác BM25 đọc trực tiếp từ tệp Parquet, trước khi được dung hợp thứ hạng RRF và nạp vào ngữ cảnh cho mô hình ngôn ngữ lớn.
+\end{itemize}
+
+\subsection{Thống kê định lượng dung lượng lưu trữ thực tế}
+Bảng~\ref{tab:storage_metrics} phản ánh bức tranh định lượng tổng thể về dung lượng lưu trữ thực tế trên đĩa qua từng tầng:
+
+\begin{table}[htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{Thống kê số lượng tệp tin và dung lượng lưu trữ thực tế trên đĩa}
+\label{tab:storage_metrics}
+\begin{tabularx}{\textwidth}{l X r r r}
+\toprule
+\textbf{Tầng Lưu Trữ} & \textbf{Định Dạng Tệp Chính} & \textbf{Số Tệp} & \textbf{Dung Lượng (Bytes)} & \textbf{Dung Lượng (MB)} \\
+\midrule
+\textbf{bronze (Tầng Đồng)} & HTML Form 10-K, JSON thô & 18 & 23.603.939 & 22,51 MB \\
+\textbf{silver (Tầng Bạc)} & Parquet (Snappy), Markdown & 10 & 1.340.217 & 1,28 MB \\
+\textbf{gold (Tầng Vàng)} & Parquet (Snappy), JSON & 17 & 2.966.924 & 2,83 MB \\
+\textbf{curated (Tầng Phục Vụ)} & ChromaDB Index, SQLite binary & 6 & 12.275.876 & 11,71 MB \\
+\midrule
+\textbf{Toàn bộ hệ thống} & Đa định dạng kết hợp & 51 & 40.186.956 & 38,33 MB \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Sự gia tăng dung lượng từ 1,28 MB (Silver) lên 2,83 MB (Gold) phản ánh việc bổ sung các trường siêu dữ liệu kiểm toán, cấu trúc phân đoạn và tạo các bản sao JSON phục vụ đối soát, hoàn toàn nằm trong mục tiêu tối ưu hóa của hệ thống.

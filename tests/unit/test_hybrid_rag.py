@@ -4,8 +4,8 @@ tests/unit/test_hybrid_rag.py: Unit tests for BM25 lexical search, RRF, and Hybr
 
 import pytest
 from unittest.mock import MagicMock, patch
-from src.rag.bm25 import BM25Okapi, tokenize
-from src.rag.hybrid_retriever import reciprocal_rank_fusion, HybridRetriever
+from src.gold.bm25 import BM25Okapi, tokenize
+from src.curated.hybrid_retriever import reciprocal_rank_fusion, HybridRetriever
 
 
 def test_bm25_tokenization():

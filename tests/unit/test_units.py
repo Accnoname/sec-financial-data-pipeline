@@ -8,16 +8,16 @@ from pathlib import Path
 import pandas as pd
 from bs4 import BeautifulSoup
 
-from src.common.config import PROJECT_ROOT, RAW_DIR, STAGING_DIR, PRIMARY_DIR, CURATED_DIR
-from src.rag.chunking import split_into_chunks
-from src.transformation.clean_10k_to_text import ITEM_1A_PATTERN, NEXT_ITEM_PATTERN
+from src.common.config import PROJECT_ROOT, BRONZE_DIR, SILVER_DIR, GOLD_DIR, CURATED_DIR, RAW_DIR, STAGING_DIR, PRIMARY_DIR
+from src.gold.chunking import split_into_chunks
+from src.silver.clean_10k_to_text import ITEM_1A_PATTERN, NEXT_ITEM_PATTERN
 import run
 
 
 def test_config_directories():
     """Verify that all data lake directory constants are resolved properly"""
     assert PROJECT_ROOT.exists()
-    for d in (RAW_DIR, STAGING_DIR, PRIMARY_DIR, CURATED_DIR):
+    for d in (BRONZE_DIR, SILVER_DIR, GOLD_DIR, CURATED_DIR, RAW_DIR, STAGING_DIR, PRIMARY_DIR):
         assert isinstance(d, Path)
 
 

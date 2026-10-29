@@ -1,0 +1,17 @@
+\section{Giới Hạn Kỹ Thuật và Hướng Phát Triển}
+
+\subsection{Các hạn chế cố hữu trong phiên bản hiện tại}
+Mặc dù đường ống đã giải quyết thành công các bài toán cốt lõi về tính bất biến, tối ưu hóa lưu trữ và khắc phục lỗi suy giảm chất lượng dữ liệu, hệ thống vẫn tồn tại ba hạn chế kỹ thuật chính cần được ghi nhận minh bạch:
+\begin{itemize}
+    \item \textbf{Điều phối đơn tiến trình cục bộ}: Động cơ PipelineDAG nội bộ chạy trực tiếp trên một tiến trình Python duy nhất. Việc thiếu một bộ lập lịch phân tán chuẩn mực (như Celery Executor hay Kubernetes Pod Operator) giới hạn khả năng mở rộng quy mô khi cần thu thập đồng thời hàng nghìn báo cáo trong các tuần cao điểm nộp hồ sơ.
+    \item \textbf{Cơ chế cảm biến ở cấp độ tệp tin (File-level Delta)}: Hệ thống phát hiện thay đổi dựa trên mã hồ sơ nộp \texttt{accessionNumber}. Khi có báo cáo mới, toàn bộ Mục 1A của công ty đó được trích xuất và tính toán véc-tơ hóa lại từ đầu, chưa hỗ trợ so khớp thay đổi ở cấp độ từng câu văn bản (\textit{Semantic Sentence Diff}) để chỉ nhúng lại phần nội dung mới.
+    \item \textbf{Thiếu cơ chế cảnh báo thời gian thực (Real-time Observability)}: Việc giám sát phụ thuộc chủ yếu vào tệp nhật ký \path{orchestration_audit.jsonl} và dòng lệnh, chưa có bảng điều khiển trực quan tập trung (Dashboard) để gửi cảnh báo tức thì qua email hoặc webhook khi tác vụ bị treo hoặc tỷ lệ lỗi mạng tăng đột biến.
+\end{itemize}
+
+\subsection{Lộ trình nâng cấp và mở rộng kiến trúc tương lai}
+Để nâng cấp đường ống từ một hệ thống độc lập thành một nền tảng dữ liệu tài chính cấp doanh nghiệp (\textit{Enterprise Financial Data Platform}), các định hướng nghiên cứu và phát triển tiếp theo tập trung vào ba trụ cột chiến lược:
+\begin{itemize}
+    \item \textbf{Đóng gói vi dịch vụ và điều phối với Apache Airflow}: Chuyển đổi từng bước nghiệp vụ (\texttt{extract}, \texttt{clean}, \texttt{chunk}, \texttt{embed}) thành các container Docker độc lập, thiết lập luồng điều phối trên Apache Airflow hoặc Prefect triển khai trên Kubernetes, tận dụng khả năng tự động co giãn (\textit{Autoscaling}) và tích hợp cảnh báo qua Slack/Teams.
+    \item \textbf{Tích hợp định dạng bảng hồ chứa mở Apache Iceberg}: Nâng cấp bảng Parquet lên định dạng bảng hồ chứa mở Apache Iceberg hoặc Delta Lake nhằm hỗ trợ giao dịch ACID, cho phép truy vấn dữ liệu lịch sử theo mốc thời gian (\textit{Time Travel}) để kiểm toán phiên bản rủi ro qua từng năm, và tự động tối ưu hóa kích thước tệp nén trên đám mây (AWS S3 hoặc Google Cloud Storage).
+    \item \textbf{Hệ thống giám sát trôi dạt dữ liệu (Data Drift Monitoring)}: Tích hợp nền tảng kiểm định chất lượng tự động Great Expectations vào các chốt kiểm soát (Quality Gates), kết hợp Evidently AI để theo dõi sự biến động phân phối từ khóa và phát hiện hiện tượng trôi dạt ngữ nghĩa (\textit{Concept Drift}) của các yếu tố rủi ro kinh doanh theo thời gian thực.
+\end{itemize}

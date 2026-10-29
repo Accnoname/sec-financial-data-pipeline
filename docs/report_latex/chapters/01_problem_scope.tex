@@ -1,0 +1,28 @@
+\section{Bài Toán và Phạm Vi Kỹ Thuật}
+
+\subsection{Bối cảnh kỹ thuật và bài toán đặt ra}
+Trong thị trường tài chính hiện đại, báo cáo thường niên Form 10-K nộp lên Ủy ban Chứng khoán và Giao dịch Hoa Kỳ (SEC) là nguồn dữ liệu pháp lý tối quan trọng, phản ánh toàn diện tình hình hoạt động kinh doanh, cấu trúc tài chính và đặc biệt là các yếu tố rủi ro tiềm ẩn của doanh nghiệp đại chúng. Trong số các mục nội dung bắt buộc, Mục 1A (\textit{Item 1A. Risk Factors}) chứa đựng các phân tích chi tiết về rủi ro địa chính trị, đứt gãy chuỗi cung ứng, cạnh tranh công nghệ, an ninh mạng và biến động kinh tế vĩ mô.
+
+Tuy nhiên, việc khai thác tự động nguồn dữ liệu này đối mặt với các thách thức kỹ thuật lớn trong kỹ thuật dữ liệu (Data Engineering):
+\begin{itemize}
+    \item \textbf{Dung lượng và tính phi cấu trúc}: Các báo cáo được phát hành dưới định dạng HTML hoặc iXBRL phi cấu trúc có dung lượng từ 3 MB đến 8 MB mỗi tệp, chứa nhiều thẻ định dạng lồng nhau, rác kịch bản và sự phân mảnh trong cấu trúc tiêu đề.
+    \item \textbf{Quy chuẩn truy cập nghiêm ngặt}: Máy chủ SEC áp đặt trần giới hạn tốc độ 10 yêu cầu/giây và bắt buộc đính kèm nhận diện User-Agent, đòi hỏi cơ chế điều tiết nhịp độ và thử lại mạng tự động để tránh bị khóa truy cập.
+    \item \textbf{Duy trì tính toàn vẹn dữ liệu}: Quá trình chuẩn bị dữ liệu bán cấu trúc đòi hỏi một đường ống vững chắc, có khả năng xử lý dị thường, kiểm soát chất lượng và bảo đảm tính nhất quán qua các tầng lưu trữ.
+\end{itemize}
+
+\subsection{Đối tượng thụ hưởng và định dạng đầu ra}
+Đầu ra của đường ống dữ liệu phục vụ trực tiếp hai nhóm đối tượng chính:
+\begin{itemize}
+    \item \textbf{Nhóm Kỹ sư Dữ liệu \& Nhà phân tích Định lượng}: Cần truy cập các tập dữ liệu có cấu trúc dạng bảng để thực hiện các phép truy vấn lọc, tổng hợp và phân tích so sánh liên công ty thông qua các công cụ phân tích hiện đại như DuckDB hoặc Polars.
+    \item \textbf{Nhóm Hệ thống Trí tuệ Nhân tạo \& Truy hồi (RAG)}: Yêu cầu dữ liệu phải được phân đoạn chính xác, bảo toàn trọn vẹn ngữ nghĩa câu và tương thích tuyệt đối với cửa sổ ngữ cảnh hữu hạn của các mô hình nhúng véc-tơ.
+\end{itemize}
+Đầu ra của hệ thống được tiêu chuẩn hóa dưới dạng tệp tin Apache Parquet nén Snappy tại Tầng Vàng (Gold Layer) và cơ sở dữ liệu véc-tơ nhúng ChromaDB tại Tầng Phục vụ (Curated Layer).
+
+\subsection{Phạm vi giới hạn và các mục tiêu không thực hiện}
+Để tập trung tối đa nguồn lực vào việc xây dựng kiến trúc đường ống dữ liệu chuẩn mực, có khả năng chịu lỗi cao và minh chứng rõ nét các nguyên lý cốt lõi của kỹ thuật dữ liệu, dự án xác lập rõ ràng ranh giới phạm vi kỹ thuật qua bốn giới hạn then chốt:
+\begin{itemize}
+    \item \textbf{Phạm vi thực thể (Entity Scope)}: Đường ống tập trung xử lý chuyên sâu nhóm 7 tập đoàn công nghệ lớn (Magnificent Seven: AAPL, AMZN, GOOGL, META, MSFT, NVDA, TSLA), thay vì mở rộng dàn trải ra hơn 10.400 doanh nghiệp niêm yết.
+    \item \textbf{Phạm vi biểu mẫu (Form Scope)}: Hệ thống chỉ thu thập báo cáo thường niên Form 10-K và trích xuất Mục 1A (Risk Factors), không bao gồm báo cáo quý Form 10-Q hay báo cáo đột xuất Form 8-K.
+    \item \textbf{Hạ tầng tối giản (Minimalist Infrastructure)}: Dự án loại bỏ hoàn toàn các cụm máy chủ container hóa nặng nề ngoài luồng như Spark, Airflow hay MinIO; toàn bộ vòng đời dữ liệu được quản trị trực tiếp trên hệ thống tệp tin cục bộ và động cơ DAG nội bộ.
+    \item \textbf{Ranh giới chức năng (Functional Boundary)}: Đường ống không đảm nhận việc huấn luyện lại mô hình học sâu hay xây dựng giao diện phức tạp, mà tập trung bảo đảm dữ liệu đầu ra đạt độ tin cậy tuyệt đối về mặt kỹ thuật cho các hệ thống hạ nguồn.
+\end{itemize}

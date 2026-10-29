@@ -44,7 +44,7 @@ Dữ liệu được tổ chức qua 4 tầng chất lượng tăng dần, mỗi
 +------------------------------------------------------------------------------------+
 
 data/
-|-- 01_raw/                          [BRONZE: Dữ liệu gốc bất biến từ nguồn]
+|-- bronze/                          [BRONZE: Dữ liệu gốc bất biến từ nguồn]
 |   |-- companies/
 |   |   `-- all_companies.json       (~10.400 công ty từ SEC EDGAR)
 |   `-- sec_filings/
@@ -56,7 +56,7 @@ data/
 |       |-- NVDA/nvda-20260125.htm
 |       `-- TSLA/tsla-20251231.htm
 |
-|-- 02_staging/                      [SILVER: Đã làm sạch và cấu trúc hóa]
+|-- silver/                          [SILVER: Đã làm sạch và cấu trúc hóa]
 |   |-- companies_clean.parquet      (CIK chuẩn hóa 10 chữ số, loại trùng, Snappy)
 |   `-- sec_filings/
 |       |-- AAPL/AAPL_2025_risk_factors.md
@@ -67,7 +67,7 @@ data/
 |       |-- NVDA/NVDA_2026_risk_factors.md
 |       `-- TSLA/TSLA_2025_risk_factors.md
 |
-|-- 03_primary/                      [GOLD: Đoạn ngữ nghĩa đã làm giàu metadata]
+|-- gold/                            [GOLD: Đoạn ngữ nghĩa đã làm giàu metadata & BM25]
 |   `-- chunks/
 |       |-- AAPL_2025_chunks.parquet va .json
 |       |-- AMZN_2025_chunks.parquet va .json
@@ -76,21 +76,21 @@ data/
 |       |-- MSFT_2026_chunks.parquet va .json
 |       |-- NVDA_2026_chunks.parquet va .json
 |       |-- TSLA_2025_chunks.parquet va .json
-|       `-- all_chunks.parquet       (Tổng hợp 262 chunks toàn bộ 7 công ty)
+|       `-- all_chunks.parquet       (Tổng hợp 925 chunks toàn bộ 7 công ty)
 |
-`-- 04_curated/                      [CURATED: Chỉ mục Vector phục vụ RAG]
-    `-- vector_db/                   (Chroma / Qdrant / FAISS)
+`-- curated/                         [CURATED: Chỉ mục Vector phục vụ RAG]
+    `-- vector_db/                   (ChromaDB HNSW Cosine Index)
 ```
 
 ### Đặc Tả Kỹ Thuật Từng Tầng
 
 | Tầng | Đường dẫn | Định dạng | Nén | Hợp đồng nội dung |
 |---|---|---|---|---|
-| **Bronze** | `data/01_raw/` | JSON, HTML/XBRL | Không nén | Bản sao nguyên vẹn từng byte từ SEC API. Chỉ đọc sau khi ghi (Immutable). |
-| **Silver - Companies** | `data/02_staging/` | Apache Parquet | Snappy | Cột `cik_str` (string, 10 ký tự có đệm số 0), `ticker`, `title`. Không trùng lặp. |
-| **Silver - Filings** | `data/02_staging/` | Markdown | UTF-8 | Văn bản Item 1A thuần túy. Không chứa thẻ script, style hay mã XBRL. Độ dài tối thiểu 10.000 ký tự. |
-| **Gold** | `data/03_primary/` | Apache Parquet / JSON | Snappy | Cột: `chunk_id`, `ticker`, `fiscal_year`, `section`, `chunk_index`, `word_count`, `text`. |
-| **Curated** | `data/04_curated/` | Vector Index | Nhị phân | Vector dày đặc (384 đến 1.536 chiều) ánh xạ với `chunk_id` và metadata tại tầng Gold. |
+| **Bronze** | `data/bronze/` | JSON, HTML/XBRL | Không nén | Bản sao nguyên vẹn từng byte từ SEC API. Chỉ đọc sau khi ghi (Immutable). |
+| **Silver - Companies** | `data/silver/` | Apache Parquet | Snappy | Cột `cik` (string, 10 ký tự có đệm số 0), `ticker`, `name`. Không trùng lặp. |
+| **Silver - Filings** | `data/silver/` | Markdown | UTF-8 | Văn bản Item 1A thuần túy. Không chứa thẻ script, style hay mã XBRL. Độ dài tối thiểu 10.000 ký tự. |
+| **Gold** | `data/gold/` | Apache Parquet / JSON | Snappy | Cột: `chunk_id`, `ticker`, `year`, `section`, `chunk_index`, `word_count`, `text`. |
+| **Curated** | `data/curated/` | Vector Index | Nhị phân | Vector dày đặc (384 chiều) ánh xạ với `chunk_id` và metadata tại tầng Gold. |
 
 ---
 
@@ -99,18 +99,25 @@ data/
 ```text
 src/
 |-- common/
-|   |-- config.py             # Định vị đường dẫn gốc dự án và hằng số thư mục
+|   |-- config.py             # Định vị đường dẫn gốc dự án và hằng số thư mục Medallion
 |   `-- logger.py             # Ghi log chuẩn ISO timestamp đồng nhất toàn hệ thống
-|-- ingestion/
+|-- bronze/                   # TẦNG BRONZE: Thu thập dữ liệu thô
 |   |-- extract_companies.py  # Thu thập danh mục công ty từ SEC EDGAR API
-|   `-- ingest_10k_filings.py # Tải báo cáo Form 10-K với kiểm soát tốc độ (rate limit)
-|-- transformation/
-|   |-- clean_companies.py    # Chuẩn hóa CIK, loại trùng lặp, xuất Parquet
-|   `-- clean_10k_to_text.py  # Phân tích DOM, lọc thẻ rác, trích xuất Item 1A bằng RegEx
-`-- rag/
-    |-- chunking.py           # Cắt đoạn cửa sổ trượt và tạo metadata đi kèm
-    |-- embedder.py           # Tạo vector embedding bằng sentence-transformers, nạp ChromaDB
-    `-- retriever.py          # Truy vấn ngữ nghĩa và tổng hợp câu trả lời qua Gemini API
+|   `-- ingest_10k_filings.py # Tải báo cáo Form 10-K với kiểm soát delta sensor
+|-- silver/                   # TẦNG SILVER: Làm sạch & chuẩn hóa
+|   |-- clean_companies.py    # Chuẩn hóa CIK 10 số, loại trùng lặp, xuất Parquet Snappy
+|   `-- clean_10k_to_text.py  # Phân tích DOM, lọc thẻ rác, trích xuất Item 1A Markdown
+|-- gold/                     # TẦNG GOLD: Bóc tách ngữ nghĩa & Chỉ mục từ khóa
+|   |-- chunking.py           # Phân đoạn token-aware window và tổng hợp all_chunks.parquet
+|   `-- bm25.py               # Okapi BM25 ranking phục vụ tìm kiếm từ khóa chính xác
+|-- curated/                  # TẦNG CURATED: Phục vụ AI / RAG
+|   |-- embedder.py           # Tạo vector embedding bằng sentence-transformers, nạp ChromaDB
+|   |-- hybrid_retriever.py   # Dung hợp thứ hạng RRF (BM25 Gold + Dense Curated)
+|   `-- retriever.py          # Truy vấn ngữ nghĩa và tổng hợp câu trả lời qua Gemini API
+|-- orchestration/            # Điều phối DAG, Retry Backoff, Quality Gates, Scheduler
+|-- ingestion/                # (Forwarder tương thích ngược -> src/bronze)
+|-- transformation/           # (Forwarder tương thích ngược -> src/silver)
+`-- rag/                      # (Forwarder tương thích ngược -> src/gold & src/curated)
 ```
 
 ### Chi Tiết Từng Module
@@ -169,15 +176,14 @@ src/
     WHERE ticker = 'NVDA' AND text LIKE '%artificial intelligence%';
 
 [Hệ thống AI RAG - Tầng Curated]
-  - Mô hình embedding: Sentence-Transformers (ví dụ: all-MiniLM-L6-v2)
-  - Vector Store: Qdrant / Chroma / FAISS (chạy local qua docker-compose.yml)
-  - Truy xuất: Tìm kiếm độ tương đồng Cosine, top-k kết quả
-  - Tổng hợp LLM: So sánh rủi ro giữa nhiều tập đoàn theo câu hỏi ngôn ngữ tự nhiên
+  - Mô hình embedding: Sentence-Transformers (all-MiniLM-L6-v2, 384 dimensions)
+  - Vector Store: ChromaDB PersistentClient nhúng (lưu trữ cục bộ tại data/04_curated/vector_db)
+  - Truy xuất: Hybrid Search kết hợp BM25 Okapi Lexical và Dense Cosine Similarity qua Reciprocal Rank Fusion (RRF k=60)
+  - Tổng hợp LLM: Gemini AI (gemini-2.5-flash) với trích dẫn nguồn kiểm toán nguyên bản Form 10-K
 
-[Hạ tầng dịch vụ - docker-compose.yml]
-  - postgres: Data Warehouse cục bộ (cổng 5432)
-  - qdrant: Vector Database (cổng 6333/6334)
-  - minio: Object Storage tương thích S3 / Data Lake cục bộ (cổng 9000/9001)
+[Hạ tầng lưu trữ cục bộ - Lightweight Medallion Lakehouse]
+  - Định dạng: Tệp tin Parquet nén Snappy kết hợp Markdown và ChromaDB nhúng
+  - Tối ưu hóa: Không sử dụng các dịch vụ container cồng kềnh ngoài luồng (như PostgreSQL, Qdrant hay MinIO), toàn bộ dữ liệu hồ chứa vận hành trực tiếp trên hệ thống tệp tin cục bộ, đảm bảo tính gọn nhẹ, khởi chạy tức thì và tính tất định.
 ```
 
 ---
